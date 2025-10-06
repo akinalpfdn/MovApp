@@ -14,12 +14,38 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
     }
 }
 
+struct ScrollWheelHandler: NSViewRepresentable {
+    var onScroll: (CGFloat) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = ScrollWheelView()
+        view.onScroll = onScroll
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if let scrollView = nsView as? ScrollWheelView {
+            scrollView.onScroll = onScroll
+        }
+    }
+
+    class ScrollWheelView: NSView {
+        var onScroll: ((CGFloat) -> Void)?
+
+        override func scrollWheel(with event: NSEvent) {
+            onScroll?(event.scrollingDeltaX)
+        }
+    }
+}
+
 struct ContentView: View {
     @StateObject private var scanner = ApplicationScanner()
     @State private var searchText = ""
     @State private var window: NSWindow?
     @State private var currentPageIndex = 0
-    @State private var scrollOffset: CGFloat = 0
+    @State private var dragOffset: CGFloat = 0
+    @State private var isDragging = false
+    @State private var scrollDelta: CGFloat = 0
     
     // Calculate number of rows that fit in screen
     private var rows: Int {
@@ -88,65 +114,70 @@ struct ContentView: View {
             } else {
                 GeometryReader { geometry in
                     let pageWidth = geometry.size.width
+                    let totalOffset = -CGFloat(currentPageIndex) * pageWidth + dragOffset
 
                     ScrollViewReader { proxy in
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 0) {
-                                ForEach(0..<numberOfPages(), id: \.self) { pageIndex in
-                                    LazyVGrid(
-                                        columns: Array(repeating: GridItem(.fixed(150), spacing: 30), count: columns),
-                                        spacing: 30
-                                    ) {
-                                        ForEach(appsForPage(pageIndex)) { app in
-                                            Button(action: {
-                                                print("CLICKED: \(app.name)")
-                                                app.launch()
-                                            }) {
-                                                AppIconView(app: app)
-                                            }
-                                            .buttonStyle(.plain)
+                        HStack(spacing: 0) {
+                            ForEach(0..<numberOfPages(), id: \.self) { pageIndex in
+                                LazyVGrid(
+                                    columns: Array(repeating: GridItem(.fixed(150), spacing: 30), count: columns),
+                                    spacing: 30
+                                ) {
+                                    ForEach(appsForPage(pageIndex)) { app in
+                                        Button(action: {
+                                            print("CLICKED: \(app.name)")
+                                            app.launch()
+                                        }) {
+                                            AppIconView(app: app)
                                         }
+                                        .buttonStyle(.plain)
                                     }
-                                    .frame(width: pageWidth)
-                                    .id(pageIndex)
                                 }
+                                .frame(width: pageWidth)
+                                .id(pageIndex)
                             }
                         }
-                        .simultaneousGesture(
+                        .offset(x: totalOffset)
+                        .gesture(
                             DragGesture()
+                                .onChanged { value in
+                                    isDragging = true
+                                    dragOffset = value.translation.width
+                                }
                                 .onEnded { value in
-                                    let threshold: CGFloat = 50
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    isDragging = false
+                                    let threshold: CGFloat = pageWidth * 0.3
+
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                                         if value.translation.width < -threshold && currentPageIndex < numberOfPages() - 1 {
                                             currentPageIndex += 1
                                         } else if value.translation.width > threshold && currentPageIndex > 0 {
                                             currentPageIndex -= 1
                                         }
-                                        proxy.scrollTo(currentPageIndex, anchor: .leading)
+                                        dragOffset = 0
                                     }
                                 }
                         )
-                        .onContinuousHover { phase in
-                            // Detect trackpad scroll events
-                        }
                         .background(
-                            GeometryReader { geo in
-                                Color.clear.preference(
-                                    key: ScrollOffsetPreferenceKey.self,
-                                    value: geo.frame(in: .named("scroll")).origin.x
-                                )
+                            ScrollWheelHandler { deltaX in
+                                scrollDelta += deltaX
+
+                                let scrollThreshold: CGFloat = 50
+
+                                if scrollDelta < -scrollThreshold && currentPageIndex < numberOfPages() - 1 {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                        currentPageIndex += 1
+                                    }
+                                    scrollDelta = 0
+                                } else if scrollDelta > scrollThreshold && currentPageIndex > 0 {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                        currentPageIndex -= 1
+                                    }
+                                    scrollDelta = 0
+                                }
                             }
                         )
-                        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                            // Calculate current page based on scroll position
-                            let offset = -value
-                            let page = Int(round(offset / pageWidth))
-                            if page != currentPageIndex && page >= 0 && page < numberOfPages() {
-                                currentPageIndex = page
-                            }
-                        }
                     }
-                    .coordinateSpace(name: "scroll")
                 }
 
                 // Page indicators
