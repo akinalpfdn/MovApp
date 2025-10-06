@@ -19,10 +19,10 @@ A modern, elegant macOS application launcher with iOS-style interface and powerf
 ## 📸 Screenshots
 
 ### Grid View
-![Grid View](screenshots/grid-view.png)
+![Grid View](MovApp/Screenshot at Oct 07 01-28-49.png)
 
 ### Arrange Mode
-![Arrange Mode](screenshots/arrange-view.png)
+![Arrange Mode](MovApp/Screenshot at Oct 07 01-29-27.png)
 
 ## 🚀 Installation
 
