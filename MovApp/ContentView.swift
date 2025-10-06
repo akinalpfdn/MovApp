@@ -6,11 +6,98 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ScrollOffsetPreferenceKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
+    }
+}
+
+struct AppIconButton: View {
+    let app: Application
+    @Binding var isArrangeMode: Bool
+    @Binding var draggedApp: Application?
+    @Binding var reorderedApps: [Application]
+    let filteredApps: [Application]
+
+    @State private var wiggleRotation: Double = 0
+
+    var body: some View {
+        Button(action: {
+            if !isArrangeMode {
+                print("CLICKED: \(app.name)")
+                app.launch()
+            }
+        }) {
+            AppIconView(app: app)
+                .opacity(draggedApp?.id == app.id && isArrangeMode ? 0.5 : 1.0)
+                .rotationEffect(.degrees(wiggleRotation))
+        }
+        .buttonStyle(.plain)
+        .onLongPressGesture(minimumDuration: 0.5) {
+            withAnimation {
+                isArrangeMode = true
+                if reorderedApps.isEmpty {
+                    reorderedApps = filteredApps
+                }
+            }
+        }
+        .onDrag {
+            if isArrangeMode {
+                draggedApp = app
+                return NSItemProvider(object: app.id as NSString)
+            }
+            return NSItemProvider()
+        }
+        .onDrop(of: [.text], delegate: AppDropDelegate(
+            app: app,
+            apps: $reorderedApps,
+            draggedApp: $draggedApp
+        ))
+        .onChange(of: isArrangeMode) { _, newValue in
+            if newValue {
+                startWiggle()
+            } else {
+                wiggleRotation = 0
+            }
+        }
+    }
+
+    func startWiggle() {
+        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
+            if !isArrangeMode {
+                timer.invalidate()
+                wiggleRotation = 0
+            } else {
+                withAnimation(.easeInOut(duration: 0.1)) {
+                    wiggleRotation = Double.random(in: -2...2)
+                }
+            }
+        }
+    }
+}
+
+struct AppDropDelegate: DropDelegate {
+    let app: Application
+    @Binding var apps: [Application]
+    @Binding var draggedApp: Application?
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedApp = nil
+        return true
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard let draggedApp = draggedApp,
+              let fromIndex = apps.firstIndex(where: { $0.id == draggedApp.id }),
+              let toIndex = apps.firstIndex(where: { $0.id == app.id }),
+              fromIndex != toIndex else { return }
+
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            apps.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+        }
     }
 }
 
@@ -44,6 +131,9 @@ struct ContentView: View {
     @State private var window: NSWindow?
     @State private var currentPageIndex = 0
     @State private var lastScrollTime: Date = Date()
+    @State private var isArrangeMode = false
+    @State private var draggedApp: Application?
+    @State private var reorderedApps: [Application] = []
     
     // Calculate number of rows that fit in screen
     private var rows: Int {
@@ -61,10 +151,12 @@ struct ContentView: View {
     }
     
     var filteredApps: [Application] {
+        let apps = reorderedApps.isEmpty ? scanner.applications : reorderedApps
+
         if searchText.isEmpty {
-            return scanner.applications
+            return apps
         }
-        return scanner.applications.filter { app in
+        return apps.filter { app in
             app.name.localizedCaseInsensitiveContains(searchText)
         }
     }
@@ -122,13 +214,13 @@ struct ContentView: View {
                                     spacing: 30
                                 ) {
                                     ForEach(appsForPage(pageIndex)) { app in
-                                        Button(action: {
-                                            print("CLICKED: \(app.name)")
-                                            app.launch()
-                                        }) {
-                                            AppIconView(app: app)
-                                        }
-                                        .buttonStyle(.plain)
+                                        AppIconButton(
+                                            app: app,
+                                            isArrangeMode: $isArrangeMode,
+                                            draggedApp: $draggedApp,
+                                            reorderedApps: $reorderedApps,
+                                            filteredApps: filteredApps
+                                        )
                                     }
                                 }
                                 .frame(width: pageWidth)
@@ -180,7 +272,17 @@ struct ContentView: View {
                 .padding(.bottom, 20)
             }
             }.background(.ultraThinMaterial)
-         
+            .onKeyPress(.escape) {
+                if isArrangeMode {
+                    withAnimation {
+                        isArrangeMode = false
+                        draggedApp = nil
+                    }
+                    return .handled
+                }
+                return .ignored
+            }
+
         .task {
             await scanner.scanApplications()
         }
