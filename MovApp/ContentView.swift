@@ -186,7 +186,7 @@ struct ContentView: View {
     }
     
     var filteredApps: [Application] {
-        let apps = reorderedApps.isEmpty ? scanner.applications : reorderedApps
+        let apps = reorderedApps.isEmpty ? loadOrderedApps() : reorderedApps
 
         if searchText.isEmpty {
             return apps
@@ -194,6 +194,40 @@ struct ContentView: View {
         return apps.filter { app in
             app.name.localizedCaseInsensitiveContains(searchText)
         }
+    }
+
+    // Load saved app order
+    func loadOrderedApps() -> [Application] {
+        guard let savedOrder = UserDefaults.standard.array(forKey: "appOrder") as? [String] else {
+            return scanner.applications
+        }
+
+        // Create dictionary for fast lookup
+        var appDict: [String: Application] = [:]
+        for app in scanner.applications {
+            appDict[app.id] = app
+        }
+
+        // Rebuild array in saved order
+        var ordered: [Application] = []
+        for id in savedOrder {
+            if let app = appDict[id] {
+                ordered.append(app)
+                appDict.removeValue(forKey: id)
+            }
+        }
+
+        // Add any new apps at the end
+        ordered.append(contentsOf: appDict.values.sorted { $0.name < $1.name })
+
+        return ordered
+    }
+
+    // Save app order
+    func saveAppOrder() {
+        let order = reorderedApps.map { $0.id }
+        UserDefaults.standard.set(order, forKey: "appOrder")
+        print("Saved app order: \(order.count) apps")
     }
     
     // Split apps into pages
@@ -313,6 +347,7 @@ struct ContentView: View {
                         isArrangeMode = false
                         draggedApp = nil
                     }
+                    saveAppOrder()
                     return .handled
                 }
                 return .ignored
@@ -320,6 +355,12 @@ struct ContentView: View {
 
         .task {
             await scanner.scanApplications()
+        }
+        .onChange(of: reorderedApps) { oldValue, newValue in
+            // Save whenever apps are reordered or deleted
+            if !newValue.isEmpty && oldValue != newValue {
+                saveAppOrder()
+            }
         }
     }
     
