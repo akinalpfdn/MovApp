@@ -4,19 +4,19 @@ struct AppIconView: View {
     let app: Application
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             Image(nsImage: app.icon)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 80, height: 80)
+                .frame(width: 96, height: 96)
 
             Text(app.name)
-                .font(.system(size: 12))
+                .font(.system(size: 13))
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
-                .frame(width: 100)
+                .frame(width: 120)
                 .foregroundColor(.white)
         }
-        .frame(width: 100, height: 125)
+        .frame(width: 120, height: 150)
     }
 }

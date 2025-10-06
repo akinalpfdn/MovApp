@@ -16,12 +16,12 @@ struct ContentView: View {
     private var rows: Int {
         let screenHeight = NSScreen.main?.visibleFrame.height ?? 900
         let availableHeight = screenHeight - 100 // minus search bar
-        let rowHeight: CGFloat = 155 // icon (125) + spacing (30)
+        let rowHeight: CGFloat = 180 // icon (150) + spacing (30)
         return max(4, Int(availableHeight / rowHeight))
     }
 
     private var columns: [GridItem] {
-        return Array(repeating: GridItem(.fixed(125), spacing: 30), count: rows)
+        return Array(repeating: GridItem(.fixed(150), spacing: 30), count: rows)
     }
 
     var filteredApps: [Application] {

@@ -38,10 +38,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             // Center window
             window.center()
-
-            // Make window appear on top initially
-            window.level = .floating
-            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         }
     }
 
