@@ -45,7 +45,7 @@ struct ContentView: View {
     @State private var currentPageIndex = 0
     @State private var dragOffset: CGFloat = 0
     @State private var isDragging = false
-    @State private var scrollDelta: CGFloat = 0
+    @State private var lastScrollTime: Date = Date()
     
     // Calculate number of rows that fit in screen
     private var rows: Int {
@@ -160,21 +160,25 @@ struct ContentView: View {
                         )
                         .background(
                             ScrollWheelHandler { deltaX in
-                                scrollDelta += deltaX
+                                let now = Date()
+                                let timeSinceLastScroll = now.timeIntervalSince(lastScrollTime)
 
-                                let scrollThreshold: CGFloat = 25
+                                // Debounce: only process if 0.15 seconds have passed
+                                guard timeSinceLastScroll > 0.15 else { return }
 
-                                if abs(scrollDelta) >= scrollThreshold {
-                                    if scrollDelta < 0 && currentPageIndex < numberOfPages() - 1 {
-                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                                let threshold: CGFloat = 5
+
+                                if abs(deltaX) >= threshold {
+                                    lastScrollTime = now
+
+                                    if deltaX < 0 && currentPageIndex < numberOfPages() - 1 {
+                                        withAnimation(.spring(response: 0.25, dampingFraction: 0.92)) {
                                             currentPageIndex += 1
                                         }
-                                        scrollDelta = 0
-                                    } else if scrollDelta > 0 && currentPageIndex > 0 {
-                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                                    } else if deltaX > 0 && currentPageIndex > 0 {
+                                        withAnimation(.spring(response: 0.25, dampingFraction: 0.92)) {
                                             currentPageIndex -= 1
                                         }
-                                        scrollDelta = 0
                                     }
                                 }
                             }
