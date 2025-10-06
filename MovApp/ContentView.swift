@@ -23,31 +23,57 @@ struct AppIconButton: View {
     let filteredApps: [Application]
 
     @State private var wiggleRotation: Double = 0
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
-        Button(action: {
-            if !isArrangeMode {
-                print("CLICKED: \(app.name)")
-                app.launch()
-            }
-        }) {
+        ZStack(alignment: .topLeading) {
             AppIconView(app: app)
                 .opacity(draggedApp?.id == app.id && isArrangeMode ? 0.5 : 1.0)
                 .rotationEffect(.degrees(wiggleRotation))
+                .onTapGesture {
+                    if !isArrangeMode {
+                        print("CLICKED: \(app.name)")
+                        app.launch()
+                    }
+                }
+                .onLongPressGesture(minimumDuration: 0.6) {
+                    if !isArrangeMode {
+                        withAnimation {
+                            isArrangeMode = true
+                            if reorderedApps.isEmpty {
+                                reorderedApps = filteredApps
+                            }
+                        }
+                    }
+                }
+
+            // Delete button in arrange mode
+            if isArrangeMode {
+                Button(action: {
+                    showDeleteConfirmation = true
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.white, .red)
+                        .shadow(radius: 2)
+                }
+                .buttonStyle(.plain)
+                .offset(x: -4, y: -4)
+                .transition(.scale.combined(with: .opacity))
+            }
         }
-        .buttonStyle(.plain)
-        .onLongPressGesture(minimumDuration: 1.0, perform: {
-            // Action on completion
-        }, onPressingChanged: { isPressing in
-            if isPressing {
+        .alert("Remove \(app.name)?", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Remove", role: .destructive) {
                 withAnimation {
-                    isArrangeMode = true
-                    if reorderedApps.isEmpty {
-                        reorderedApps = filteredApps
+                    if let index = reorderedApps.firstIndex(where: { $0.id == app.id }) {
+                        reorderedApps.remove(at: index)
                     }
                 }
             }
-        })
+        } message: {
+            Text("This will hide \(app.name) from the launcher. The app will not be uninstalled.")
+        }
         .onDrag {
             if isArrangeMode {
                 draggedApp = app
