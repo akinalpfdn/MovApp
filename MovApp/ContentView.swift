@@ -36,14 +36,18 @@ struct AppIconButton: View {
                 .rotationEffect(.degrees(wiggleRotation))
         }
         .buttonStyle(.plain)
-        .onLongPressGesture(minimumDuration: 0.5) {
-            withAnimation {
-                isArrangeMode = true
-                if reorderedApps.isEmpty {
-                    reorderedApps = filteredApps
+        .onLongPressGesture(minimumDuration: 1.0, perform: {
+            // Action on completion
+        }, onPressingChanged: { isPressing in
+            if isPressing {
+                withAnimation {
+                    isArrangeMode = true
+                    if reorderedApps.isEmpty {
+                        reorderedApps = filteredApps
+                    }
                 }
             }
-        }
+        })
         .onDrag {
             if isArrangeMode {
                 draggedApp = app
@@ -72,7 +76,7 @@ struct AppIconButton: View {
                 wiggleRotation = 0
             } else {
                 withAnimation(.easeInOut(duration: 0.1)) {
-                    wiggleRotation = Double.random(in: -2...2)
+                    wiggleRotation = Double.random(in: -3...3)
                 }
             }
         }
