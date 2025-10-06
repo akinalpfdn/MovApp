@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var searchText = ""
     @State private var window: NSWindow?
     @State private var currentPageIndex = 0
+    @State private var scrollOffset: CGFloat = 0
     
     // Calculate number of rows that fit in screen
     private var rows: Int {
@@ -78,24 +79,63 @@ struct ContentView: View {
                     .tint(.white)
                 Spacer()
             } else {
-                TabView(selection: $currentPageIndex) {
-                    ForEach(0..<numberOfPages(), id: \.self) { pageIndex in
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 30), count: columns), spacing: 30) {
-                            ForEach(appsForPage(pageIndex)) { app in
-                                Button(action: {
-                                    print("CLICKED: \(app.name)")
-                                    app.launch()
-                                }) {
-                                    AppIconView(app: app)
+                GeometryReader { geometry in
+                    let pageWidth = geometry.size.width
+
+                    ScrollViewReader { proxy in
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 0) {
+                                ForEach(0..<numberOfPages(), id: \.self) { pageIndex in
+                                    LazyVGrid(
+                                        columns: Array(repeating: GridItem(.fixed(150), spacing: 30), count: columns),
+                                        spacing: 30
+                                    ) {
+                                        ForEach(appsForPage(pageIndex)) { app in
+                                            Button(action: {
+                                                print("CLICKED: \(app.name)")
+                                                app.launch()
+                                            }) {
+                                                AppIconView(app: app)
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+                                    .frame(width: pageWidth)
+                                    .id(pageIndex)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
-                        .padding(30)
-                        .tag(pageIndex)
+                        .content.offset(x: scrollOffset)
+                        .gesture(
+                            DragGesture()
+                                .onEnded { value in
+                                    let threshold: CGFloat = 50
+                                    let pageWidth = geometry.size.width
+
+                                    withAnimation(.easeOut) {
+                                        if value.translation.width < -threshold && currentPageIndex < numberOfPages() - 1 {
+                                            currentPageIndex += 1
+                                        } else if value.translation.width > threshold && currentPageIndex > 0 {
+                                            currentPageIndex -= 1
+                                        }
+
+                                        scrollOffset = -CGFloat(currentPageIndex) * pageWidth
+                                        proxy.scrollTo(currentPageIndex, anchor: .leading)
+                                    }
+                                }
+                        )
                     }
                 }
-                .tabViewStyle(.automatic)
+
+                // Page indicators
+                HStack(spacing: 8) {
+                    ForEach(0..<numberOfPages(), id: \.self) { index in
+                        Circle()
+                            .fill(index == currentPageIndex ? Color.white : Color.white.opacity(0.3))
+                            .frame(width: 6, height: 6)
+                    }
+                }
+                .padding(.bottom, 20)
             }
             }.background(.ultraThinMaterial)
          
