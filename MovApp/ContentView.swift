@@ -162,18 +162,20 @@ struct ContentView: View {
                             ScrollWheelHandler { deltaX in
                                 scrollDelta += deltaX
 
-                                let scrollThreshold: CGFloat = 50
+                                let scrollThreshold: CGFloat = 25
 
-                                if scrollDelta < -scrollThreshold && currentPageIndex < numberOfPages() - 1 {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                                        currentPageIndex += 1
+                                if abs(scrollDelta) >= scrollThreshold {
+                                    if scrollDelta < 0 && currentPageIndex < numberOfPages() - 1 {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                                            currentPageIndex += 1
+                                        }
+                                        scrollDelta = 0
+                                    } else if scrollDelta > 0 && currentPageIndex > 0 {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                                            currentPageIndex -= 1
+                                        }
+                                        scrollDelta = 0
                                     }
-                                    scrollDelta = 0
-                                } else if scrollDelta > scrollThreshold && currentPageIndex > 0 {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                                        currentPageIndex -= 1
-                                    }
-                                    scrollDelta = 0
                                 }
                             }
                         )
