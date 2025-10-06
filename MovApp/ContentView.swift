@@ -43,8 +43,6 @@ struct ContentView: View {
     @State private var searchText = ""
     @State private var window: NSWindow?
     @State private var currentPageIndex = 0
-    @State private var dragOffset: CGFloat = 0
-    @State private var isDragging = false
     @State private var lastScrollTime: Date = Date()
     
     // Calculate number of rows that fit in screen
@@ -114,7 +112,7 @@ struct ContentView: View {
             } else {
                 GeometryReader { geometry in
                     let pageWidth = geometry.size.width
-                    let totalOffset = -CGFloat(currentPageIndex) * pageWidth + dragOffset
+                    let totalOffset = -CGFloat(currentPageIndex) * pageWidth
 
                     ScrollViewReader { proxy in
                         HStack(spacing: 0) {
@@ -138,26 +136,6 @@ struct ContentView: View {
                             }
                         }
                         .offset(x: totalOffset)
-                        .gesture(
-                            DragGesture()
-                                .onChanged { value in
-                                    isDragging = true
-                                    dragOffset = value.translation.width
-                                }
-                                .onEnded { value in
-                                    isDragging = false
-                                    let threshold: CGFloat = pageWidth * 0.3
-
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                                        if value.translation.width < -threshold && currentPageIndex < numberOfPages() - 1 {
-                                            currentPageIndex += 1
-                                        } else if value.translation.width > threshold && currentPageIndex > 0 {
-                                            currentPageIndex -= 1
-                                        }
-                                        dragOffset = 0
-                                    }
-                                }
-                        )
                         .background(
                             ScrollWheelHandler { deltaX in
                                 let now = Date()
