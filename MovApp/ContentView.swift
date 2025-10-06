@@ -53,9 +53,10 @@ struct ContentView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Search bar
-            HStack {
+   
+            VStack(spacing: 0) {
+                // Search bar
+                HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.white.opacity(0.6))
                 
@@ -65,7 +66,7 @@ struct ContentView: View {
                     .foregroundColor(.white)
             }
             .padding(12)
-            .background(Color.white.opacity(0.1))
+            .background(Color.black.opacity(0.7))
             .cornerRadius(8)
             .padding()
             
@@ -96,7 +97,8 @@ struct ContentView: View {
                 }
                 .tabViewStyle(.automatic)
             }
-        }
+            }.background(.ultraThinMaterial)
+         
         .task {
             await scanner.scanApplications()
         }
