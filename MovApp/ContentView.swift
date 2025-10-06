@@ -62,17 +62,22 @@ struct AppIconButton: View {
                 .transition(.scale.combined(with: .opacity))
             }
         }
-        .alert("Remove \(app.name)?", isPresented: $showDeleteConfirmation) {
+        .alert("Uninstall \(app.name)?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
-            Button("Remove", role: .destructive) {
-                withAnimation {
-                    if let index = reorderedApps.firstIndex(where: { $0.id == app.id }) {
-                        reorderedApps.remove(at: index)
+            Button("Move to Trash", role: .destructive) {
+                let success = app.uninstall()
+                if success {
+                    withAnimation {
+                        if let index = reorderedApps.firstIndex(where: { $0.id == app.id }) {
+                            reorderedApps.remove(at: index)
+                        }
                     }
+                } else {
+                    print("Failed to uninstall \(app.name)")
                 }
             }
         } message: {
-            Text("This will hide \(app.name) from the launcher. The app will not be uninstalled.")
+            Text("This will move \(app.name) and its related files to the Trash. This action can be undone from the Trash.")
         }
         .onDrag {
             if isArrangeMode {
