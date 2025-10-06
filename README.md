@@ -1,6 +1,6 @@
 # MovApp
 
-A modern, elegant macOS application launcher with iOS-style interface and powerful uninstall capabilities.
+due to the removal off Launchpad and new suck Apps dialog, a light weight launchpad alternative
 
 ![macOS](https://img.shields.io/badge/macOS-11.0+-blue.svg)
 ![Swift](https://img.shields.io/badge/Swift-5.9-orange.svg)
