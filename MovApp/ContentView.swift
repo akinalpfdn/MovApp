@@ -7,6 +7,13 @@
 
 import SwiftUI
 
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 struct ContentView: View {
     @StateObject private var scanner = ApplicationScanner()
     @State private var searchText = ""
@@ -105,26 +112,41 @@ struct ContentView: View {
                                 }
                             }
                         }
-                        .content.offset(x: scrollOffset)
-                        .gesture(
+                        .simultaneousGesture(
                             DragGesture()
                                 .onEnded { value in
                                     let threshold: CGFloat = 50
-                                    let pageWidth = geometry.size.width
-
-                                    withAnimation(.easeOut) {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                         if value.translation.width < -threshold && currentPageIndex < numberOfPages() - 1 {
                                             currentPageIndex += 1
                                         } else if value.translation.width > threshold && currentPageIndex > 0 {
                                             currentPageIndex -= 1
                                         }
-
-                                        scrollOffset = -CGFloat(currentPageIndex) * pageWidth
                                         proxy.scrollTo(currentPageIndex, anchor: .leading)
                                     }
                                 }
                         )
+                        .onContinuousHover { phase in
+                            // Detect trackpad scroll events
+                        }
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: ScrollOffsetPreferenceKey.self,
+                                    value: geo.frame(in: .named("scroll")).origin.x
+                                )
+                            }
+                        )
+                        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                            // Calculate current page based on scroll position
+                            let offset = -value
+                            let page = Int(round(offset / pageWidth))
+                            if page != currentPageIndex && page >= 0 && page < numberOfPages() {
+                                currentPageIndex = page
+                            }
+                        }
                     }
+                    .coordinateSpace(name: "scroll")
                 }
 
                 // Page indicators
@@ -133,6 +155,11 @@ struct ContentView: View {
                         Circle()
                             .fill(index == currentPageIndex ? Color.white : Color.white.opacity(0.3))
                             .frame(width: 6, height: 6)
+                            .onTapGesture {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    currentPageIndex = index
+                                }
+                            }
                     }
                 }
                 .padding(.bottom, 20)
