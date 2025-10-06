@@ -12,7 +12,17 @@ struct ContentView: View {
     @State private var searchText = ""
     @State private var window: NSWindow?
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 30), count: 8)
+    // Calculate number of rows that fit in screen
+    private var rows: Int {
+        let screenHeight = NSScreen.main?.visibleFrame.height ?? 900
+        let availableHeight = screenHeight - 100 // minus search bar
+        let rowHeight: CGFloat = 155 // icon (125) + spacing (30)
+        return max(4, Int(availableHeight / rowHeight))
+    }
+
+    private var columns: [GridItem] {
+        return Array(repeating: GridItem(.fixed(125), spacing: 30), count: rows)
+    }
 
     var filteredApps: [Application] {
         if searchText.isEmpty {
@@ -53,8 +63,8 @@ struct ContentView: View {
                         .tint(.white)
                     Spacer()
                 } else {
-                    ScrollView {
-                        LazyVGrid(columns: columns, spacing: 30) {
+                    ScrollView(.horizontal) {
+                        LazyHGrid(rows: columns, spacing: 30) {
                             ForEach(filteredApps) { app in
                                 AppIconView(app: app)
                                     .onTapGesture(count: 2) {
@@ -64,6 +74,7 @@ struct ContentView: View {
                         }
                         .padding()
                     }
+                    .scrollIndicators(.hidden)
                 }
             }
 

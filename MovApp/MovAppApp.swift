@@ -30,6 +30,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             window.isOpaque = false
             window.backgroundColor = .clear
 
+            // Maximize window size to fill screen (not fullscreen)
+            if let screen = NSScreen.main {
+                let screenFrame = screen.visibleFrame
+                window.setFrame(screenFrame, display: true)
+            }
+
             // Center window
             window.center()
 
