@@ -8,6 +8,24 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+extension FileManager {
+    func allocatedSizeOfDirectory(at url: URL) throws -> Int64 {
+        guard let enumerator = self.enumerator(at: url, includingPropertiesForKeys: [.totalFileAllocatedSizeKey]) else {
+            return 0
+        }
+
+        var totalSize: Int64 = 0
+        for case let fileURL as URL in enumerator {
+            guard let resourceValues = try? fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey]),
+                  let size = resourceValues.totalFileAllocatedSize else {
+                continue
+            }
+            totalSize += Int64(size)
+        }
+        return totalSize
+    }
+}
+
 struct ScrollOffsetPreferenceKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
@@ -160,6 +178,12 @@ struct ScrollWheelHandler: NSViewRepresentable {
     }
 }
 
+enum SortOption: String, CaseIterable {
+    case manual = "Manual (Custom Order)"
+    case nameAsc = "Name (A-Z)"
+    case nameDesc = "Name (Z-A)"
+}
+
 struct ContentView: View {
     @StateObject private var scanner = ApplicationScanner()
     @State private var searchText = ""
@@ -170,6 +194,7 @@ struct ContentView: View {
     @State private var isArrangeMode = false
     @State private var draggedApp: Application?
     @State private var reorderedApps: [Application] = []
+    @State private var sortOption: SortOption = .manual
     
     // Calculate number of rows that fit in screen
     private var rows: Int {
@@ -189,16 +214,27 @@ struct ContentView: View {
     var filteredApps: [Application] {
         let apps = reorderedApps.isEmpty ? loadOrderedApps() : reorderedApps
 
-        if searchText.isEmpty {
-            return apps
-        }
-
-        let filtered = apps.filter { app in
+        // Filter by search
+        let filtered = searchText.isEmpty ? apps : apps.filter { app in
             app.name.localizedCaseInsensitiveContains(searchText)
         }
 
-        print("Search: '\(searchText)' -> Found \(filtered.count) apps out of \(apps.count)")
-        return filtered
+        // Sort
+        let sorted = sortApps(filtered)
+
+        return sorted
+    }
+
+    func sortApps(_ apps: [Application]) -> [Application] {
+        switch sortOption {
+        case .manual:
+            // Keep custom order (from drag & drop or default)
+            return apps
+        case .nameAsc:
+            return apps.sorted { $0.name.localizedCompare($1.name) == .orderedAscending }
+        case .nameDesc:
+            return apps.sorted { $0.name.localizedCompare($1.name) == .orderedDescending }
+        }
     }
 
     // Load saved app order
@@ -253,23 +289,57 @@ struct ContentView: View {
     var body: some View {
    
             VStack(spacing: 0) {
-                // Search bar
-                HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.white.opacity(0.6))
-                
-                TextField("Search applications...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 16))
-                    .foregroundColor(.white)
-                    .onChange(of: searchText) { _, _ in
-                        currentPageIndex = 0
+                // Search and Sort bar
+                HStack(spacing: 12) {
+                    // Search
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.white.opacity(0.6))
+
+                        TextField("Search applications...", text: $searchText)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 16))
+                            .foregroundColor(.white)
+                            .onChange(of: searchText) { _, _ in
+                                currentPageIndex = 0
+                            }
                     }
-            }
-            .padding(12)
-            .background(Color.black.opacity(0.7))
-            .cornerRadius(8)
-            .padding()
+                    .padding(12)
+                    .background(Color.black.opacity(0.7))
+                    .cornerRadius(8)
+
+                    // Sort dropdown
+                    Menu {
+                        ForEach(SortOption.allCases, id: \.self) { option in
+                            Button(action: {
+                                sortOption = option
+                                currentPageIndex = 0
+                            }) {
+                                HStack {
+                                    Text(option.rawValue)
+                                    if sortOption == option {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.up.arrow.down")
+                                .font(.system(size: 14))
+                            Text("Sort")
+                                .font(.system(size: 14))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(Color.black.opacity(0.7))
+                        .cornerRadius(8)
+                    }
+                    .menuStyle(.borderlessButton)
+                }
+                .padding(.horizontal)
+                .padding(.top)
             
             // App grid
             if scanner.isLoading {
@@ -305,6 +375,18 @@ struct ContentView: View {
                             }
                         }
                         .offset(x: totalOffset)
+                        .background(
+                            Color.clear
+                                .onTapGesture {
+                                    if isArrangeMode {
+                                        withAnimation {
+                                            isArrangeMode = false
+                                            draggedApp = nil
+                                        }
+                                        saveAppOrder()
+                                    }
+                                }
+                        )
                         .background(
                             ScrollWheelHandler { deltaX in
                                 // Ignore if already processing a scroll
