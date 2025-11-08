@@ -165,7 +165,8 @@ struct ContentView: View {
     @State private var searchText = ""
     @State private var window: NSWindow?
     @State private var currentPageIndex = 0
-    @State private var lastScrollTime: Date = Date()
+    @State private var isScrolling = false
+    @State private var scrollDebounceTask: Task<Void, Never>?
     @State private var isArrangeMode = false
     @State private var draggedApp: Application?
     @State private var reorderedApps: [Application] = []
@@ -299,25 +300,44 @@ struct ContentView: View {
                         .offset(x: totalOffset)
                         .background(
                             ScrollWheelHandler { deltaX in
-                                let now = Date()
-                                let timeSinceLastScroll = now.timeIntervalSince(lastScrollTime)
+                                // Ignore if already processing a scroll
+                                guard !isScrolling else { return }
 
-                                // Debounce: only process if 0.15 seconds have passed
-                                guard timeSinceLastScroll > 0.15 else { return }
+                                let threshold: CGFloat = 10
 
-                                let threshold: CGFloat = 5
+                                // Only respond to significant scroll
+                                guard abs(deltaX) > threshold else { return }
 
-                                if abs(deltaX) >= threshold {
-                                    lastScrollTime = now
+                                // Determine direction
+                                let scrollRight = deltaX < 0
+                                let scrollLeft = deltaX > 0
 
-                                    if deltaX < 0 && currentPageIndex < numberOfPages() - 1 {
-                                        withAnimation(.spring(response: 0.25, dampingFraction: 0.92)) {
-                                            currentPageIndex += 1
-                                        }
-                                    } else if deltaX > 0 && currentPageIndex > 0 {
-                                        withAnimation(.spring(response: 0.25, dampingFraction: 0.92)) {
-                                            currentPageIndex -= 1
-                                        }
+                                // Check if we can move in that direction
+                                let canScrollRight = scrollRight && currentPageIndex < numberOfPages() - 1
+                                let canScrollLeft = scrollLeft && currentPageIndex > 0
+
+                                guard canScrollRight || canScrollLeft else { return }
+
+                                // Set scrolling flag
+                                isScrolling = true
+
+                                // Cancel existing debounce task
+                                scrollDebounceTask?.cancel()
+
+                                // Change page
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.92)) {
+                                    if canScrollRight {
+                                        currentPageIndex += 1
+                                    } else if canScrollLeft {
+                                        currentPageIndex -= 1
+                                    }
+                                }
+
+                                // Reset scrolling flag after animation + cooldown
+                                scrollDebounceTask = Task {
+                                    try? await Task.sleep(nanoseconds: 600_000_000) // 0.6 seconds
+                                    if !Task.isCancelled {
+                                        isScrolling = false
                                     }
                                 }
                             }
