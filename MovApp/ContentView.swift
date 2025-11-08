@@ -192,9 +192,13 @@ struct ContentView: View {
         if searchText.isEmpty {
             return apps
         }
-        return apps.filter { app in
+
+        let filtered = apps.filter { app in
             app.name.localizedCaseInsensitiveContains(searchText)
         }
+
+        print("Search: '\(searchText)' -> Found \(filtered.count) apps out of \(apps.count)")
+        return filtered
     }
 
     // Load saved app order
@@ -258,6 +262,9 @@ struct ContentView: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: 16))
                     .foregroundColor(.white)
+                    .onChange(of: searchText) { _, _ in
+                        currentPageIndex = 0
+                    }
             }
             .padding(12)
             .background(Color.black.opacity(0.7))
