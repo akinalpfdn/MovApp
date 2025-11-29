@@ -33,37 +33,48 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
     }
 }
 
-struct AppIconButton: View {
-    let app: Application
+struct GridItemButton: View {
+    let item: GridItem
     @Binding var isArrangeMode: Bool
-    @Binding var draggedApp: Application?
-    @Binding var reorderedApps: [Application]
-    let filteredApps: [Application]
+    @Binding var draggedItem: GridItem?
+    @Binding var gridItems: [GridItem]
+    @Binding var folders: [Folder]
+    @Binding var openFolder: Folder?
+    let filteredItems: [GridItem]
 
     @State private var wiggleRotation: Double = 0
     @State private var showDeleteConfirmation = false
+    @State private var isHoveringOver = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            AppIconView(app: app)
-                .opacity(draggedApp?.id == app.id && isArrangeMode ? 0.5 : 1.0)
-                .rotationEffect(.degrees(wiggleRotation))
-                .onTapGesture {
-                    if !isArrangeMode {
-                        print("CLICKED: \(app.name)")
-                        app.launch()
-                    }
+            // Display app or folder
+            Group {
+                switch item {
+                case .app(let app):
+                    AppIconView(app: app)
+                case .folder(let folder):
+                    FolderIconView(folder: folder)
                 }
-                .onLongPressGesture(minimumDuration: 0.6) {
-                    if !isArrangeMode {
-                        withAnimation {
-                            isArrangeMode = true
-                            if reorderedApps.isEmpty {
-                                reorderedApps = filteredApps
-                            }
+            }
+            .opacity(draggedItem?.id == item.id && isArrangeMode ? 0.5 : 1.0)
+            .rotationEffect(.degrees(wiggleRotation))
+            .scaleEffect(isHoveringOver ? 1.1 : 1.0)
+            .onTapGesture {
+                if !isArrangeMode {
+                    handleTap()
+                }
+            }
+            .onLongPressGesture(minimumDuration: 0.6) {
+                if !isArrangeMode {
+                    withAnimation {
+                        isArrangeMode = true
+                        if gridItems.isEmpty {
+                            gridItems = filteredItems
                         }
                     }
                 }
+            }
 
             // Delete button in arrange mode
             if isArrangeMode {
@@ -80,40 +91,88 @@ struct AppIconButton: View {
                 .transition(.scale.combined(with: .opacity))
             }
         }
-        .alert("Uninstall \(app.name)?", isPresented: $showDeleteConfirmation) {
+        .alert(getItemName(), isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
-            Button("Move to Trash", role: .destructive) {
-                let success = app.uninstall()
-                if success {
-                    withAnimation {
-                        if let index = reorderedApps.firstIndex(where: { $0.id == app.id }) {
-                            reorderedApps.remove(at: index)
-                        }
-                    }
-                } else {
-                    print("Failed to uninstall \(app.name)")
-                }
+            Button(item.isFolder ? "Delete Folder" : "Move to Trash", role: .destructive) {
+                handleDelete()
             }
         } message: {
-            Text("This will move \(app.name) and its related files to the Trash. This action can be undone from the Trash.")
+            Text(getDeleteMessage())
         }
         .onDrag {
             if isArrangeMode {
-                draggedApp = app
-                return NSItemProvider(object: app.id as NSString)
+                draggedItem = item
+                return NSItemProvider(object: item.id as NSString)
             }
             return NSItemProvider()
         }
-        .onDrop(of: [.text], delegate: AppDropDelegate(
-            app: app,
-            apps: $reorderedApps,
-            draggedApp: $draggedApp
+        .onDrop(of: [.text], delegate: GridItemDropDelegate(
+            item: item,
+            items: $gridItems,
+            folders: $folders,
+            draggedItem: $draggedItem
         ))
         .onChange(of: isArrangeMode) { _, newValue in
             if newValue {
                 startWiggle()
             } else {
                 wiggleRotation = 0
+            }
+        }
+    }
+
+    func handleTap() {
+        switch item {
+        case .app(let app):
+            app.launch()
+        case .folder(let folder):
+            openFolder = folder
+        }
+    }
+
+    func getItemName() -> String {
+        switch item {
+        case .app(let app):
+            return "Uninstall \(app.name)?"
+        case .folder(let folder):
+            return "Delete \(folder.name)?"
+        }
+    }
+
+    func getDeleteMessage() -> String {
+        switch item {
+        case .app(let app):
+            return "This will move \(app.name) and its related files to the Trash."
+        case .folder:
+            return "This will delete the folder. Apps will be moved back to the main grid."
+        }
+    }
+
+    func handleDelete() {
+        switch item {
+        case .app(let app):
+            let success = app.uninstall()
+            if success {
+                withAnimation {
+                    if let index = gridItems.firstIndex(where: { $0.id == item.id }) {
+                        gridItems.remove(at: index)
+                    }
+                }
+            }
+        case .folder(let folder):
+            withAnimation {
+                // Remove folder from grid
+                if let index = gridItems.firstIndex(where: { $0.id == item.id }) {
+                    gridItems.remove(at: index)
+                }
+                // Remove from folders array
+                if let folderIndex = folders.firstIndex(where: { $0.id == folder.id }) {
+                    folders.remove(at: folderIndex)
+                }
+                // Add apps back to grid
+                for app in folder.apps {
+                    gridItems.append(.app(app))
+                }
             }
         }
     }
@@ -132,24 +191,120 @@ struct AppIconButton: View {
     }
 }
 
-struct AppDropDelegate: DropDelegate {
-    let app: Application
-    @Binding var apps: [Application]
-    @Binding var draggedApp: Application?
+extension GridItem {
+    var isFolder: Bool {
+        if case .folder = self {
+            return true
+        }
+        return false
+    }
+}
+
+struct GridItemDropDelegate: DropDelegate {
+    let item: GridItem
+    @Binding var items: [GridItem]
+    @Binding var folders: [Folder]
+    @Binding var draggedItem: GridItem?
 
     func performDrop(info: DropInfo) -> Bool {
-        draggedApp = nil
+        // Check if dropping app on app to create folder
+        if let dragged = draggedItem,
+           case .app(let draggedApp) = dragged,
+           case .app(let targetApp) = item,
+           draggedApp.id != targetApp.id {
+            createFolder(draggedApp: draggedApp, targetApp: targetApp)
+            draggedItem = nil
+            return true
+        }
+
+        // Check if dropping app on folder to add to folder
+        if let dragged = draggedItem,
+           case .app(let draggedApp) = dragged,
+           case .folder(var targetFolder) = item {
+            addAppToFolder(app: draggedApp, folder: &targetFolder)
+            draggedItem = nil
+            return true
+        }
+
+        draggedItem = nil
         return true
     }
 
     func dropEntered(info: DropInfo) {
-        guard let draggedApp = draggedApp,
-              let fromIndex = apps.firstIndex(where: { $0.id == draggedApp.id }),
-              let toIndex = apps.firstIndex(where: { $0.id == app.id }),
+        guard let draggedItem = draggedItem,
+              let fromIndex = items.firstIndex(where: { $0.id == draggedItem.id }),
+              let toIndex = items.firstIndex(where: { $0.id == item.id }),
               fromIndex != toIndex else { return }
 
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            apps.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+        // Only reorder if not creating folder
+        if !shouldCreateFolder() {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                items.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+            }
+        }
+    }
+
+    func shouldCreateFolder() -> Bool {
+        guard let dragged = draggedItem else { return false }
+        if case .app = dragged, case .app = item {
+            return true
+        }
+        return false
+    }
+
+    func createFolder(draggedApp: Application, targetApp: Application) {
+        withAnimation {
+            // Find target app's position to preserve it
+            guard let targetIndex = items.firstIndex(where: { item in
+                if case .app(let app) = item {
+                    return app.id == targetApp.id
+                }
+                return false
+            }) else { return }
+
+            // Remove both apps from items
+            items.removeAll { item in
+                if case .app(let app) = item {
+                    return app.id == draggedApp.id || app.id == targetApp.id
+                }
+                return false
+            }
+
+            // Create new folder at target app's position
+            let newFolder = Folder(
+                name: "Folder",
+                apps: [targetApp, draggedApp]
+            )
+            folders.append(newFolder)
+
+            // Insert folder at the original position of target app
+            let insertIndex = min(targetIndex, items.count)
+            items.insert(.folder(newFolder), at: insertIndex)
+        }
+    }
+
+    func addAppToFolder(app: Application, folder: inout Folder) {
+        withAnimation {
+            // Remove app from items
+            items.removeAll { item in
+                if case .app(let a) = item {
+                    return a.id == app.id
+                }
+                return false
+            }
+
+            // Add app to folder
+            folder.apps.append(app)
+
+            // Update folder in folders array
+            if let folderIndex = folders.firstIndex(where: { $0.id == folder.id }) {
+                folders[folderIndex] = folder
+            }
+
+            // Update folder in items array
+            if let itemIndex = items.firstIndex(where: { $0.id == folder.id }) {
+                items[itemIndex] = .folder(folder)
+            }
         }
     }
 }
@@ -192,9 +347,11 @@ struct ContentView: View {
     @State private var isScrolling = false
     @State private var scrollDebounceTask: Task<Void, Never>?
     @State private var isArrangeMode = false
-    @State private var draggedApp: Application?
-    @State private var reorderedApps: [Application] = []
+    @State private var draggedItem: GridItem?
+    @State private var gridItems: [GridItem] = []
+    @State private var folders: [Folder] = []
     @State private var sortOption: SortOption = .manual
+    @State private var openFolder: Folder?
     
     // Calculate number of rows that fit in screen
     private var rows: Int {
@@ -211,79 +368,130 @@ struct ContentView: View {
         return max(4, Int(availableWidth / columnWidth))
     }
     
-    var filteredApps: [Application] {
-        let apps = reorderedApps.isEmpty ? loadOrderedApps() : reorderedApps
+    var filteredItems: [GridItem] {
+        let items = gridItems.isEmpty ? loadOrderedItems() : gridItems
 
         // Filter by search
-        let filtered = searchText.isEmpty ? apps : apps.filter { app in
-            app.name.localizedCaseInsensitiveContains(searchText)
+        let filtered = searchText.isEmpty ? items : items.filter { item in
+            switch item {
+            case .app(let app):
+                return app.name.localizedCaseInsensitiveContains(searchText)
+            case .folder(let folder):
+                return folder.name.localizedCaseInsensitiveContains(searchText) ||
+                       folder.apps.contains { $0.name.localizedCaseInsensitiveContains(searchText) }
+            }
         }
 
         // Sort
-        let sorted = sortApps(filtered)
+        let sorted = sortItems(filtered)
 
         return sorted
     }
 
-    func sortApps(_ apps: [Application]) -> [Application] {
+    func sortItems(_ items: [GridItem]) -> [GridItem] {
         switch sortOption {
         case .manual:
-            // Keep custom order (from drag & drop or default)
-            return apps
+            return items
         case .nameAsc:
-            return apps.sorted { $0.name.localizedCompare($1.name) == .orderedAscending }
+            return items.sorted { getName($0).localizedCompare(getName($1)) == .orderedAscending }
         case .nameDesc:
-            return apps.sorted { $0.name.localizedCompare($1.name) == .orderedDescending }
+            return items.sorted { getName($0).localizedCompare(getName($1)) == .orderedDescending }
         }
     }
 
-    // Load saved app order
-    func loadOrderedApps() -> [Application] {
-        guard let savedOrder = UserDefaults.standard.array(forKey: "appOrder") as? [String] else {
-            return scanner.applications
+    func getName(_ item: GridItem) -> String {
+        switch item {
+        case .app(let app):
+            return app.name
+        case .folder(let folder):
+            return folder.name
         }
+    }
 
-        // Create dictionary for fast lookup
-        var appDict: [String: Application] = [:]
-        for app in scanner.applications {
-            appDict[app.id] = app
-        }
-
-        // Rebuild array in saved order
-        var ordered: [Application] = []
-        for id in savedOrder {
-            if let app = appDict[id] {
-                ordered.append(app)
-                appDict.removeValue(forKey: id)
+    // Load saved items (apps + folders)
+    func loadOrderedItems() -> [GridItem] {
+        // Load folders
+        if let foldersData = UserDefaults.standard.data(forKey: "folders"),
+           let loadedFolders = try? JSONDecoder().decode([FolderData].self, from: foldersData) {
+            folders = loadedFolders.map { data in
+                let apps = data.appPaths.compactMap { path in
+                    scanner.applications.first { $0.path == path }
+                }
+                return Folder(id: data.id, name: data.name, apps: apps)
             }
         }
 
-        // Add any new apps at the end
-        ordered.append(contentsOf: appDict.values.sorted { $0.name < $1.name })
+        // Get apps not in folders
+        let appsInFolders = Set(folders.flatMap { $0.apps.map { $0.id } })
+        let availableApps = scanner.applications.filter { !appsInFolders.contains($0.id) }
 
-        return ordered
+        // Create grid items
+        var items: [GridItem] = availableApps.map { .app($0) }
+        items.append(contentsOf: folders.map { .folder($0) })
+
+        // Load saved order
+        if let savedOrder = UserDefaults.standard.array(forKey: "gridOrder") as? [String] {
+            var itemDict: [String: GridItem] = [:]
+            for item in items {
+                itemDict[item.id] = item
+            }
+
+            var ordered: [GridItem] = []
+            for id in savedOrder {
+                if let item = itemDict[id] {
+                    ordered.append(item)
+                    itemDict.removeValue(forKey: id)
+                }
+            }
+
+            // Add new items at the end
+            ordered.append(contentsOf: itemDict.values)
+            return ordered
+        }
+
+        return items
     }
 
-    // Save app order
-    func saveAppOrder() {
-        let order = reorderedApps.map { $0.id }
-        UserDefaults.standard.set(order, forKey: "appOrder")
-        print("Saved app order: \(order.count) apps")
+    struct FolderData: Codable {
+        let id: String
+        let name: String
+        let appPaths: [String]
     }
-    
-    // Split apps into pages
-    func appsForPage(_ pageIndex: Int) -> [Application] {
-        let appsPerPage = rows * columns
-        let startIndex = pageIndex * appsPerPage
-        let endIndex = min(startIndex + appsPerPage, filteredApps.count)
-        
-        guard startIndex < filteredApps.count else { return [] }
-        return Array(filteredApps[startIndex..<endIndex])
+
+    // Save grid order and folders
+    func saveGridOrder() {
+        // Save item order
+        let order = gridItems.map { $0.id }
+        UserDefaults.standard.set(order, forKey: "gridOrder")
+
+        // Save folders
+        let folderData = folders.map { folder in
+            FolderData(
+                id: folder.id,
+                name: folder.name,
+                appPaths: folder.apps.map { $0.path }
+            )
+        }
+        if let encoded = try? JSONEncoder().encode(folderData) {
+            UserDefaults.standard.set(encoded, forKey: "folders")
+        }
+
+        print("Saved grid order: \(order.count) items, \(folders.count) folders")
     }
-    
+
+    // Split items into pages
+    func itemsForPage(_ pageIndex: Int) -> [GridItem] {
+        let itemsPerPage = rows * columns
+        let startIndex = pageIndex * itemsPerPage
+        let endIndex = min(startIndex + itemsPerPage, filteredItems.count)
+
+        guard startIndex < filteredItems.count else { return [] }
+        return Array(filteredItems[startIndex..<endIndex])
+    }
+
     func numberOfPages() -> Int {
-        let appsPerPage = rows * columns
-        return max(1, (filteredApps.count + appsPerPage - 1) / appsPerPage)
+        let itemsPerPage = rows * columns
+        return max(1, (filteredItems.count + itemsPerPage - 1) / itemsPerPage)
     }
     
     var body: some View {
@@ -357,16 +565,18 @@ struct ContentView: View {
                         HStack(spacing: 0) {
                             ForEach(0..<numberOfPages(), id: \.self) { pageIndex in
                                 LazyVGrid(
-                                    columns: Array(repeating: GridItem(.fixed(150), spacing: 30), count: columns),
+                                    columns: Array(repeating: SwiftUI.GridItem(.fixed(150), spacing: 30), count: columns),
                                     spacing: 30
                                 ) {
-                                    ForEach(appsForPage(pageIndex)) { app in
-                                        AppIconButton(
-                                            app: app,
+                                    ForEach(itemsForPage(pageIndex)) { item in
+                                        GridItemButton(
+                                            item: item,
                                             isArrangeMode: $isArrangeMode,
-                                            draggedApp: $draggedApp,
-                                            reorderedApps: $reorderedApps,
-                                            filteredApps: filteredApps
+                                            draggedItem: $draggedItem,
+                                            gridItems: $gridItems,
+                                            folders: $folders,
+                                            openFolder: $openFolder,
+                                            filteredItems: filteredItems
                                         )
                                     }
                                 }
@@ -381,9 +591,9 @@ struct ContentView: View {
                                     if isArrangeMode {
                                         withAnimation {
                                             isArrangeMode = false
-                                            draggedApp = nil
+                                            draggedItem = nil
                                         }
-                                        saveAppOrder()
+                                        saveGridOrder()
                                     }
                                 }
                         )
@@ -454,21 +664,90 @@ struct ContentView: View {
                 if isArrangeMode {
                     withAnimation {
                         isArrangeMode = false
-                        draggedApp = nil
+                        draggedItem = nil
                     }
-                    saveAppOrder()
+                    saveGridOrder()
                     return .handled
                 }
                 return .ignored
+            }
+            .sheet(item: $openFolder) { folder in
+                FolderSheetView(
+                    folder: folder,
+                    isPresented: Binding(
+                        get: { openFolder != nil },
+                        set: { if !$0 { openFolder = nil } }
+                    ),
+                    onRemoveApp: { appToRemove in
+                        withAnimation {
+                            // Remove app from folder
+                            if let folderIndex = folders.firstIndex(where: { $0.id == folder.id }) {
+                                folders[folderIndex].apps.removeAll { $0.id == appToRemove.id }
+
+                                // If folder is empty, delete it
+                                if folders[folderIndex].apps.isEmpty {
+                                    folders.remove(at: folderIndex)
+                                    gridItems.removeAll { item in
+                                        if case .folder(let f) = item {
+                                            return f.id == folder.id
+                                        }
+                                        return false
+                                    }
+                                    openFolder = nil
+                                } else {
+                                    // Update folder in grid
+                                    if let itemIndex = gridItems.firstIndex(where: { $0.id == folder.id }) {
+                                        gridItems[itemIndex] = .folder(folders[folderIndex])
+                                    }
+                                    // Refresh the sheet with updated folder
+                                    openFolder = folders[folderIndex]
+                                }
+                            }
+
+                            // Add app back to grid
+                            gridItems.append(.app(appToRemove))
+                            saveGridOrder()
+                        }
+                    },
+                    onRenameFolder: { newName in
+                        print("Renaming folder to: \(newName)")
+                        if let folderIndex = folders.firstIndex(where: { $0.id == folder.id }) {
+                            folders[folderIndex].name = newName
+                            print("Updated folders array: \(folders[folderIndex].name)")
+                            if let itemIndex = gridItems.firstIndex(where: { $0.id == folder.id }) {
+                                gridItems[itemIndex] = .folder(folders[folderIndex])
+                            }
+                            // Refresh the sheet with updated folder
+                            openFolder = folders[folderIndex]
+                            print("Set openFolder to updated folder")
+                            saveGridOrder()
+                        }
+                    },
+                    onReorderApps: { reorderedApps in
+                        if let folderIndex = folders.firstIndex(where: { $0.id == folder.id }) {
+                            folders[folderIndex].apps = reorderedApps
+                            if let itemIndex = gridItems.firstIndex(where: { $0.id == folder.id }) {
+                                gridItems[itemIndex] = .folder(folders[folderIndex])
+                            }
+                            saveGridOrder()
+                        }
+                    }
+                )
             }
 
         .task {
             await scanner.scanApplications()
         }
-        .onChange(of: reorderedApps) { oldValue, newValue in
-            // Save whenever apps are reordered or deleted
+        .onChange(of: gridItems) { oldValue, newValue in
+            // Save whenever items are reordered or deleted
             if !newValue.isEmpty && oldValue != newValue {
-                saveAppOrder()
+                saveGridOrder()
+            }
+        }
+        .onChange(of: folders) { oldValue, newValue in
+            // Save whenever folders change
+            if oldValue != newValue {
+                saveGridOrder()
             }
         }
     }
