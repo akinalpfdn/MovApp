@@ -347,19 +347,32 @@ struct ContentView: View {
     @State private var sortOption: SortOption = .manual
     @State private var openFolder: Folder?
     
-    // Calculate number of rows that fit in screen
-    private var rows: Int {
-        let screenHeight = NSScreen.main?.visibleFrame.height ?? 900
-        let availableHeight = screenHeight - 100 // minus search bar
+    @State private var gridRows = 4
+    @State private var gridColumns = 4
+    
+    // Helper methods for grid layout
+    func calculateRows(availableHeight: CGFloat) -> Int {
         let rowHeight: CGFloat = 180 // icon (150) + spacing (30)
-        return max(4, Int(availableHeight / rowHeight))
+        return max(1, Int(availableHeight / rowHeight))
     }
     
-    private var columns: Int {
-        let screenWidth = NSScreen.main?.visibleFrame.width ?? 1200
-        let availableWidth = screenWidth - 60 // padding
+    func calculateColumns(availableWidth: CGFloat) -> Int {
         let columnWidth: CGFloat = 180 // icon (150) + spacing (30)
-        return max(4, Int(availableWidth / columnWidth))
+        return max(1, Int(availableWidth / columnWidth))
+    }
+    
+    func calculatePageCount(totalItems: Int, rows: Int, cols: Int) -> Int {
+        let itemsPerPage = max(1, rows * cols)
+        return max(1, (totalItems + itemsPerPage - 1) / itemsPerPage)
+    }
+    
+    func itemsForPage(_ pageIndex: Int, rows: Int, cols: Int) -> [GridItem] {
+        let itemsPerPage = max(1, rows * cols)
+        let startIndex = pageIndex * itemsPerPage
+        let endIndex = min(startIndex + itemsPerPage, filteredItems.count)
+
+        guard startIndex < filteredItems.count else { return [] }
+        return Array(filteredItems[startIndex..<endIndex])
     }
     
     var filteredItems: [GridItem] {
@@ -486,21 +499,6 @@ struct ContentView: View {
 
         print("Saved grid order: \(order.count) items, \(folders.count) folders")
     }
-
-    // Split items into pages
-    func itemsForPage(_ pageIndex: Int) -> [GridItem] {
-        let itemsPerPage = rows * columns
-        let startIndex = pageIndex * itemsPerPage
-        let endIndex = min(startIndex + itemsPerPage, filteredItems.count)
-
-        guard startIndex < filteredItems.count else { return [] }
-        return Array(filteredItems[startIndex..<endIndex])
-    }
-
-    func numberOfPages() -> Int {
-        let itemsPerPage = rows * columns
-        return max(1, (filteredItems.count + itemsPerPage - 1) / itemsPerPage)
-    }
     
     var body: some View {
    
@@ -566,17 +564,22 @@ struct ContentView: View {
                 Spacer()
             } else {
                 GeometryReader { geometry in
+                    let cols = calculateColumns(availableWidth: geometry.size.width)
+                    let rows = calculateRows(availableHeight: geometry.size.height)
+                    let numPages = calculatePageCount(totalItems: filteredItems.count, rows: rows, cols: cols)
+                    let safePageIndex = min(currentPageIndex, numPages - 1)
+                    
                     let pageWidth = geometry.size.width
-                    let totalOffset = -CGFloat(currentPageIndex) * pageWidth
+                    let totalOffset = -CGFloat(safePageIndex) * pageWidth
 
                     ScrollViewReader { proxy in
                         HStack(spacing: 0) {
-                            ForEach(0..<numberOfPages(), id: \.self) { pageIndex in
+                            ForEach(0..<numPages, id: \.self) { pageIndex in
                                 LazyVGrid(
-                                    columns: Array(repeating: SwiftUI.GridItem(.fixed(150), spacing: 30), count: columns),
+                                    columns: Array(repeating: SwiftUI.GridItem(.fixed(150), spacing: 30), count: cols),
                                     spacing: 30
                                 ) {
-                                    ForEach(itemsForPage(pageIndex)) { item in
+                                    ForEach(itemsForPage(pageIndex, rows: rows, cols: cols)) { item in
                                         GridItemButton(
                                             item: item,
                                             isArrangeMode: $isArrangeMode,
@@ -588,7 +591,7 @@ struct ContentView: View {
                                         )
                                     }
                                 }
-                                .frame(width: pageWidth)
+                                .frame(width: pageWidth, height: geometry.size.height, alignment: .top)
                                 .id(pageIndex)
                             }
                         }
@@ -620,8 +623,8 @@ struct ContentView: View {
                                 let scrollLeft = deltaX > 0
 
                                 // Check if we can move in that direction
-                                let canScrollRight = scrollRight && currentPageIndex < numberOfPages() - 1
-                                let canScrollLeft = scrollLeft && currentPageIndex > 0
+                                let canScrollRight = scrollRight && safePageIndex < numPages - 1
+                                let canScrollLeft = scrollLeft && safePageIndex > 0
 
                                 guard canScrollRight || canScrollLeft else { return }
 
@@ -634,9 +637,9 @@ struct ContentView: View {
                                 // Change page
                                 withAnimation(.spring(response: 0.25, dampingFraction: 0.92)) {
                                     if canScrollRight {
-                                        currentPageIndex += 1
+                                        currentPageIndex = safePageIndex + 1
                                     } else if canScrollLeft {
-                                        currentPageIndex -= 1
+                                        currentPageIndex = safePageIndex - 1
                                     }
                                 }
 
@@ -650,24 +653,38 @@ struct ContentView: View {
                             }
                         )
                     }
+                    // Update preference with current grid size
+                    .preference(key: GridSizeKey.self, value: GridSizeData(rows: rows, columns: cols))
                 }
-
-                // Page indicators
-                HStack(spacing: 8) {
-                    ForEach(0..<numberOfPages(), id: \.self) { index in
-                        Circle()
-                            .fill(index == currentPageIndex ? Color.white : Color.white.opacity(0.3))
-                            .frame(width: 6, height: 6)
-                            .onTapGesture {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                    currentPageIndex = index
-                                }
-                            }
+                .onPreferenceChange(GridSizeKey.self) { size in
+                    gridRows = size.rows
+                    gridColumns = size.columns
+                    
+                    // Clamp current page index if needed
+                    let numPages = calculatePageCount(totalItems: filteredItems.count, rows: gridRows, cols: gridColumns)
+                    if currentPageIndex >= numPages {
+                        currentPageIndex = max(0, numPages - 1)
                     }
                 }
-                .padding(.bottom, 20)
             }
-            }.background(.ultraThinMaterial)
+
+            // Page indicators
+            HStack(spacing: 8) {
+                let numPages = calculatePageCount(totalItems: filteredItems.count, rows: gridRows, cols: gridColumns)
+                ForEach(0..<numPages, id: \.self) { index in
+                    Circle()
+                        .fill(index == currentPageIndex ? Color.white : Color.white.opacity(0.3))
+                        .frame(width: 6, height: 6)
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                currentPageIndex = index
+                            }
+                        }
+                }
+            }
+            .padding(.bottom, 20)
+        }
+        .background(.ultraThinMaterial)
             .onKeyPress(.escape) {
                 if isArrangeMode {
                     withAnimation {
@@ -779,6 +796,4 @@ struct ContentView: View {
             }
         }
     }
-    
-    
 }
