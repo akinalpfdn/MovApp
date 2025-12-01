@@ -760,6 +760,12 @@ struct ContentView: View {
                 gridItems = loadOrderedItems()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task {
+                await scanner.scanApplications()
+                gridItems = loadOrderedItems()
+            }
+        }
         .onChange(of: gridItems) { oldValue, newValue in
             // Save whenever items are reordered or deleted
             if !newValue.isEmpty && oldValue != newValue {
