@@ -5,6 +5,7 @@ struct Application: Identifiable, Hashable {
     let name: String
     let path: String
     let bundleIdentifier: String?
+    let installDate: Date?
 
     // Cached icon for performance
     private var _icon: NSImage?
@@ -26,6 +27,48 @@ struct Application: Identifiable, Hashable {
         self.path = path
         self.bundleIdentifier = bundleIdentifier
         self._icon = icon
+
+        // Calculate install date
+        var installDate: Date?
+        do {
+            // Get the user's Applications folder path
+            let userApplicationsPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path
+
+            // Check if app is in user Applications or system Applications
+            let isUserApp = path.hasPrefix(userApplicationsPath)
+
+            let applicationsPath = isUserApp ? userApplicationsPath : "/Applications"
+            let appsAttributes = try FileManager.default.attributesOfItem(atPath: applicationsPath)
+            let appsFolderDate = appsAttributes[.creationDate] as? Date
+
+            // Get the app's file attributes
+            let attributes = try FileManager.default.attributesOfItem(atPath: path)
+
+            // For user apps, use their creation/modification date relative to when the folder was created
+            // For system apps, use a much older baseline date
+            let appCreationDate = attributes[.creationDate] as? Date
+            let appModificationDate = attributes[.modificationDate] as? Date
+
+            // Return the most reasonable date for when this app was likely installed
+            if let appCreation = appCreationDate {
+                installDate = appCreation
+            } else if let appModification = appModificationDate {
+                installDate = appModification
+            } else {
+                // Use the Applications folder date as fallback
+                installDate = appsFolderDate
+            }
+        } catch {
+            // If we can't get file attributes, fall back to bundle info
+            if let bundle = Bundle(path: path),
+               let infoDict = bundle.infoDictionary,
+               let _ = infoDict[kCFBundleVersionKey as String] as? String {
+                // Use a default date for apps without install date info
+                installDate = Date()
+            }
+        }
+
+        self.installDate = installDate
     }
 
     // Launch the application
@@ -90,7 +133,7 @@ struct Application: Identifiable, Hashable {
 
         // Delete all found files
         var filesNeedingSudo: [String] = []
-        var allSuccess = true
+        let allSuccess = true
 
         for file in filesToDelete {
             do {

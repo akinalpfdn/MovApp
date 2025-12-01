@@ -264,6 +264,11 @@ struct FolderSheetView: View {
             .frame(width: 700, height: 500)
             .background(.ultraThinMaterial)
             .cornerRadius(20)
+            .onTapGesture {
+                if isFocused {
+                    isFocused = false
+                }
+            }
         }
         .onKeyPress(.escape) {
             if isArrangeMode {

@@ -330,6 +330,7 @@ enum SortOption: String, CaseIterable {
     case manual = "Manual (Custom Order)"
     case nameAsc = "Name (A-Z)"
     case nameDesc = "Name (Z-A)"
+    case installDate = "Install Date (Newest Last)"
 }
 
 struct ContentView: View {
@@ -387,6 +388,22 @@ struct ContentView: View {
             return items.sorted { getName($0).localizedCompare(getName($1)) == .orderedAscending }
         case .nameDesc:
             return items.sorted { getName($0).localizedCompare(getName($1)) == .orderedDescending }
+        case .installDate:
+            return items.sorted { item1, item2 in
+                let date1 = getInstallDate(item1) ?? Date.distantPast
+                let date2 = getInstallDate(item2) ?? Date.distantPast
+                return date1.compare(date2) == .orderedAscending
+            }
+        }
+    }
+
+    func getInstallDate(_ item: GridItem) -> Date? {
+        switch item {
+        case .app(let app):
+            return app.installDate
+        case .folder(let folder):
+            // For folders, use the oldest install date of their apps
+            return folder.apps.compactMap { $0.installDate }.min()
         }
     }
 
