@@ -191,14 +191,7 @@ struct GridItemButton: View {
     }
 }
 
-extension GridItem {
-    var isFolder: Bool {
-        if case .folder = self {
-            return true
-        }
-        return false
-    }
-}
+
 
 struct GridItemDropDelegate: DropDelegate {
     let item: GridItem
@@ -684,6 +677,10 @@ struct ContentView: View {
                                 folders[folderIndex].name = newName
                                 if let itemIndex = gridItems.firstIndex(where: { $0.id == folder.id }) {
                                     gridItems[itemIndex] = .folder(folders[folderIndex])
+                                }
+                                // Also update the openFolder state to keep the sheet consistent
+                                if openFolder?.id == folder.id {
+                                    openFolder?.name = newName
                                 }
                                 saveGridOrder()
                             }

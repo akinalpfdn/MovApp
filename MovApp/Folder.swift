@@ -10,15 +10,6 @@ struct Folder: Identifiable, Hashable {
         self.name = name
         self.apps = apps
     }
-
-    // Hashable conformance
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
-
-    static func == (lhs: Folder, rhs: Folder) -> Bool {
-        lhs.id == rhs.id
-    }
 }
 
 // Item type that can be either an app or a folder
@@ -34,13 +25,11 @@ enum GridItem: Identifiable, Hashable {
             return folder.id
         }
     }
-
-    // Hashable conformance
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
-
-    static func == (lhs: GridItem, rhs: GridItem) -> Bool {
-        lhs.id == rhs.id
+    
+    var isFolder: Bool {
+        if case .folder = self {
+            return true
+        }
+        return false
     }
 }
