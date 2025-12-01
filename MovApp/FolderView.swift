@@ -152,24 +152,24 @@ struct FolderIconView: View {
 
 struct FolderSheetView: View {
     let folder: Folder
+    @Binding var folderName: String
     @Binding var isPresented: Bool
     let onRemoveApp: (Application) -> Void
     let onRenameFolder: (String) -> Void
     let onReorderApps: ([Application]) -> Void
 
     @State private var editingName = false
-    @State private var folderName: String
     @State private var isArrangeMode = false
     @State private var draggedApp: Application?
     @State private var folderApps: [Application]
 
-    init(folder: Folder, isPresented: Binding<Bool>, onRemoveApp: @escaping (Application) -> Void, onRenameFolder: @escaping (String) -> Void, onReorderApps: @escaping ([Application]) -> Void) {
+    init(folder: Folder, folderName: Binding<String>, isPresented: Binding<Bool>, onRemoveApp: @escaping (Application) -> Void, onRenameFolder: @escaping (String) -> Void, onReorderApps: @escaping ([Application]) -> Void) {
         self.folder = folder
+        self._folderName = folderName
         self._isPresented = isPresented
         self.onRemoveApp = onRemoveApp
         self.onRenameFolder = onRenameFolder
         self.onReorderApps = onReorderApps
-        self._folderName = State(initialValue: folder.name)
         self._folderApps = State(initialValue: folder.apps)
     }
 
@@ -207,11 +207,10 @@ struct FolderSheetView: View {
                                 editingName = false
                             }
                     } else {
-                        Text(folder.name)
+                        Text(folderName)
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
                             .onTapGesture {
-                                folderName = folder.name
                                 editingName = true
                             }
                     }
