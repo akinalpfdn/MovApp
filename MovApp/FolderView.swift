@@ -162,6 +162,7 @@ struct FolderSheetView: View {
     @State private var isArrangeMode = false
     @State private var draggedApp: Application?
     @State private var folderApps: [Application]
+    @FocusState private var isFocused: Bool
 
     init(folder: Folder, folderName: Binding<String>, isPresented: Binding<Bool>, onRemoveApp: @escaping (Application) -> Void, onRenameFolder: @escaping (String) -> Void, onReorderApps: @escaping ([Application]) -> Void) {
         self.folder = folder
@@ -200,11 +201,20 @@ struct FolderSheetView: View {
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
                             .multilineTextAlignment(.center)
+                            .focused($isFocused)
                             .onSubmit {
                                 if !folderName.isEmpty {
                                     onRenameFolder(folderName)
                                 }
                                 editingName = false
+                            }
+                            .onChange(of: isFocused) { _, focused in
+                                if !focused {
+                                    if !folderName.isEmpty {
+                                        onRenameFolder(folderName)
+                                    }
+                                    editingName = false
+                                }
                             }
                     } else {
                         Text(folderName)
@@ -212,6 +222,7 @@ struct FolderSheetView: View {
                             .foregroundColor(.white)
                             .onTapGesture {
                                 editingName = true
+                                isFocused = true
                             }
                     }
 
