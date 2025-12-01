@@ -369,10 +369,8 @@ struct ContentView: View {
     }
     
     var filteredItems: [GridItem] {
-        let items = gridItems.isEmpty ? loadOrderedItems() : gridItems
-
         // Filter by search
-        let filtered = searchText.isEmpty ? items : items.filter { item in
+        let filtered = searchText.isEmpty ? gridItems : gridItems.filter { item in
             switch item {
             case .app(let app):
                 return app.name.localizedCaseInsensitiveContains(searchText)
@@ -674,6 +672,23 @@ struct ContentView: View {
             .sheet(item: $openFolder) { folder in
                 FolderSheetView(
                     folder: folder,
+                    folderName: Binding(
+                        get: {
+                            if let folderIndex = folders.firstIndex(where: { $0.id == folder.id }) {
+                                return folders[folderIndex].name
+                            }
+                            return folder.name
+                        },
+                        set: { newName in
+                            if let folderIndex = folders.firstIndex(where: { $0.id == folder.id }) {
+                                folders[folderIndex].name = newName
+                                if let itemIndex = gridItems.firstIndex(where: { $0.id == folder.id }) {
+                                    gridItems[itemIndex] = .folder(folders[folderIndex])
+                                }
+                                saveGridOrder()
+                            }
+                        }
+                    ),
                     isPresented: Binding(
                         get: { openFolder != nil },
                         set: { if !$0 { openFolder = nil } }
@@ -710,18 +725,7 @@ struct ContentView: View {
                         }
                     },
                     onRenameFolder: { newName in
-                        print("Renaming folder to: \(newName)")
-                        if let folderIndex = folders.firstIndex(where: { $0.id == folder.id }) {
-                            folders[folderIndex].name = newName
-                            print("Updated folders array: \(folders[folderIndex].name)")
-                            if let itemIndex = gridItems.firstIndex(where: { $0.id == folder.id }) {
-                                gridItems[itemIndex] = .folder(folders[folderIndex])
-                            }
-                            // Refresh the sheet with updated folder
-                            openFolder = folders[folderIndex]
-                            print("Set openFolder to updated folder")
-                            saveGridOrder()
-                        }
+                        saveGridOrder()
                     },
                     onReorderApps: { reorderedApps in
                         if let folderIndex = folders.firstIndex(where: { $0.id == folder.id }) {
@@ -737,6 +741,10 @@ struct ContentView: View {
 
         .task {
             await scanner.scanApplications()
+            // Load items after scanning is complete
+            if gridItems.isEmpty {
+                gridItems = loadOrderedItems()
+            }
         }
         .onChange(of: gridItems) { oldValue, newValue in
             // Save whenever items are reordered or deleted
