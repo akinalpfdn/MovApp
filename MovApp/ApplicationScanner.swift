@@ -5,10 +5,16 @@ class ApplicationScanner: ObservableObject {
     @Published var applications: [Application] = []
     @Published var isLoading = false
 
-    private let applicationPaths = [
-        "/Applications",
-        "/System/Applications"
-    ]
+    private var applicationPaths: [String] {
+        let userApps = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Applications").path
+        var paths = ["/Applications", "/System/Applications"]
+        // Include ~/Applications only if it exists
+        if FileManager.default.fileExists(atPath: userApps) {
+            paths.append(userApps)
+        }
+        return paths
+    }
 
     // Scan for all applications
     func scanApplications() async {

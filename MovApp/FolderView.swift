@@ -10,6 +10,7 @@ struct FolderAppButton: View {
     let onRemove: () -> Void
 
     @State private var wiggleRotation: Double = 0
+    @State private var wiggleTimer: Timer?
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -58,20 +59,26 @@ struct FolderAppButton: View {
             if newValue {
                 startWiggle()
             } else {
+                wiggleTimer?.invalidate()
+                wiggleTimer = nil
                 wiggleRotation = 0
             }
+        }
+        .onDisappear {
+            wiggleTimer?.invalidate()
+            wiggleTimer = nil
         }
     }
 
     func startWiggle() {
-        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
-            if !isArrangeMode {
+        wiggleTimer?.invalidate()
+        wiggleTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [self] timer in
+            guard isArrangeMode else {
                 timer.invalidate()
-                wiggleRotation = 0
-            } else {
-                withAnimation(.easeInOut(duration: 0.1)) {
-                    wiggleRotation = Double.random(in: -3...3)
-                }
+                return
+            }
+            withAnimation(.easeInOut(duration: 0.1)) {
+                wiggleRotation = Double.random(in: -3...3)
             }
         }
     }
