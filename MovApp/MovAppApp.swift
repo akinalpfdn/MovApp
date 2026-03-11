@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import ServiceManagement
 
 @main
 struct MovAppApp: App {
@@ -23,6 +24,11 @@ struct MovAppApp: App {
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Register for launch at login (silent — no prompt)
+        if SMAppService.mainApp.status == .notRegistered {
+            try? SMAppService.mainApp.register()
+        }
+
         // Configure window appearance
         if let window = NSApplication.shared.windows.first {
             window.titlebarAppearsTransparent = true

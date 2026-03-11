@@ -137,9 +137,11 @@ struct ContentView: View {
             }
             .offset(x: -CGFloat(safePageIndex) * geometry.size.width)
             .background(
-                Color.clear.onTapGesture {
-                    if vm.isArrangeMode { vm.exitArrangeMode() }
-                }
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if vm.isArrangeMode { vm.exitArrangeMode() }
+                    }
             )
             .background(
                 ScrollWheelHandler { deltaX in
