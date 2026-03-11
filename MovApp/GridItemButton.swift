@@ -9,6 +9,7 @@ struct GridItemButton: View {
     @Binding var folders: [Folder]
     @Binding var openFolder: Folder?
     let filteredItems: [GridItem]
+    let isSelected: Bool
 
     @State private var wiggleRotation: Double = 0
     @State private var showDeleteConfirmation = false
@@ -54,6 +55,13 @@ struct GridItemButton: View {
                 .transition(.scale.combined(with: .opacity))
             }
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.white, lineWidth: 2.5)
+                .opacity(isSelected ? 1 : 0)
+                .padding(-6)
+                .animation(.easeInOut(duration: 0.15), value: isSelected)
+        )
         .alert(alertTitle, isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button(item.isFolder ? "Delete Folder" : "Move to Trash", role: .destructive) {

@@ -26,6 +26,8 @@ final class GridViewModel: ObservableObject {
     @Published var isScrolling: Bool = false
     @Published var gridRows: Int = 4
     @Published var gridColumns: Int = 4
+    @Published var selectedIndex: Int? = nil
+    @Published private(set) var filteredItems: [GridItem] = []
 
     private var scrollDebounceTask: Task<Void, Never>?
     private var saveDebounceTask: Task<Void, Never>?
@@ -43,26 +45,34 @@ final class GridViewModel: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
+
+        // Cache filteredItems — recompute only when inputs change
+        Publishers.CombineLatest3($gridItems, $searchText, $sortOption)
+            .map { [weak self] items, search, sort -> [GridItem] in
+                guard let self else { return [] }
+                return self.computeFilteredItems(items: items, search: search, sort: sort)
+            }
+            .assign(to: &$filteredItems)
     }
 
-    // MARK: - Computed Properties
+    // MARK: - Filtering (private, drives $filteredItems)
 
-    var filteredItems: [GridItem] {
+    private func computeFilteredItems(items: [GridItem], search: String, sort: SortOption) -> [GridItem] {
         let filtered: [GridItem]
-        if searchText.isEmpty {
-            filtered = gridItems
+        if search.isEmpty {
+            filtered = items
         } else {
-            filtered = gridItems.filter { item in
+            filtered = items.filter { item in
                 switch item {
                 case .app(let app):
-                    return app.name.localizedCaseInsensitiveContains(searchText)
+                    return app.name.localizedCaseInsensitiveContains(search)
                 case .folder(let folder):
-                    return folder.name.localizedCaseInsensitiveContains(searchText) ||
-                           folder.apps.contains { $0.name.localizedCaseInsensitiveContains(searchText) }
+                    return folder.name.localizedCaseInsensitiveContains(search) ||
+                           folder.apps.contains { $0.name.localizedCaseInsensitiveContains(search) }
                 }
             }
         }
-        return sortItems(filtered)
+        return sortItems(filtered, option: sort)
     }
 
     // MARK: - Layout
@@ -90,8 +100,8 @@ final class GridViewModel: ObservableObject {
 
     // MARK: - Sorting
 
-    func sortItems(_ items: [GridItem]) -> [GridItem] {
-        switch sortOption {
+    private func sortItems(_ items: [GridItem], option: SortOption) -> [GridItem] {
+        switch option {
         case .manual:
             return items
         case .nameAsc:
@@ -132,13 +142,17 @@ final class GridViewModel: ObservableObject {
 
     private func buildLoadedState() -> (folders: [Folder], items: [GridItem]) {
         var loadedFolders: [Folder] = []
-        if let data = UserDefaults.standard.data(forKey: "folders"),
-           let decoded = try? JSONDecoder().decode([FolderData].self, from: data) {
-            loadedFolders = decoded.map { fd in
-                let apps = fd.appPaths.compactMap { path in
-                    scanner.applications.first { $0.path == path }
+        if let data = UserDefaults.standard.data(forKey: "folders") {
+            if let decoded = try? JSONDecoder().decode([FolderData].self, from: data) {
+                loadedFolders = decoded.map { fd in
+                    let apps = fd.appPaths.compactMap { path in
+                        scanner.applications.first { $0.path == path }
+                    }
+                    return Folder(id: fd.id, name: fd.name, apps: apps)
                 }
-                return Folder(id: fd.id, name: fd.name, apps: apps)
+            } else {
+                // Corrupted — clear so next launch starts clean
+                UserDefaults.standard.removeObject(forKey: "folders")
             }
         }
 
@@ -148,6 +162,11 @@ final class GridViewModel: ObservableObject {
         var items: [GridItem] = availableApps.map { .app($0) }
         items.append(contentsOf: loadedFolders.map { .folder($0) })
 
+        // Detect corrupted gridOrder (exists but wrong type)
+        if let raw = UserDefaults.standard.object(forKey: "gridOrder"),
+           (raw as? [String]) == nil {
+            UserDefaults.standard.removeObject(forKey: "gridOrder")
+        }
         guard let savedOrder = UserDefaults.standard.array(forKey: "gridOrder") as? [String] else {
             return (loadedFolders, items)
         }
@@ -181,6 +200,55 @@ final class GridViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 100_000_000)
             if !Task.isCancelled { saveGridOrder() }
         }
+    }
+
+    // MARK: - Keyboard Navigation
+
+    enum NavDirection { case up, down, left, right }
+
+    func moveSelection(_ dir: NavDirection) {
+        let items = filteredItems
+        guard !items.isEmpty else { return }
+
+        let cols = max(1, gridColumns)
+        let total = items.count
+        let itemsPerPage = max(1, gridRows * gridColumns)
+
+        // First key press → select first item on current page
+        guard let current = selectedIndex else {
+            selectedIndex = currentPageIndex * itemsPerPage
+            return
+        }
+
+        let new: Int
+        switch dir {
+        case .left:  new = max(0, current - 1)
+        case .right: new = min(total - 1, current + 1)
+        case .up:    new = max(0, current - cols)
+        case .down:  new = min(total - 1, current + cols)
+        }
+
+        selectedIndex = new
+
+        // Auto-navigate page if selection moves off screen
+        let targetPage = new / itemsPerPage
+        if targetPage != currentPageIndex {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) {
+                currentPageIndex = targetPage
+            }
+        }
+    }
+
+    func activateSelected() {
+        guard let idx = selectedIndex, idx < filteredItems.count else { return }
+        switch filteredItems[idx] {
+        case .app(let app):        app.launch()
+        case .folder(let folder): openFolder = folder
+        }
+    }
+
+    func clearSelection() {
+        selectedIndex = nil
     }
 
     // MARK: - Scroll
