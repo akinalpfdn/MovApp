@@ -168,10 +168,14 @@ struct Application: Identifiable, Hashable {
         }
 
         // Build shell script to move all files in one command
+        // Escape single quotes in paths to prevent shell injection
         var moveCommands: [String] = []
         for file in deletableFiles {
             let fileName = (file as NSString).lastPathComponent
-            moveCommands.append("mv '\(file)' '\(trashPath)/\(fileName)'")
+            let escapedFile = file.replacingOccurrences(of: "'", with: "'\\''")
+            let escapedTrash = trashPath.replacingOccurrences(of: "'", with: "'\\''")
+            let escapedName = fileName.replacingOccurrences(of: "'", with: "'\\''")
+            moveCommands.append("mv '\(escapedFile)' '\(escapedTrash)/\(escapedName)'")
         }
 
         let shellScript = moveCommands.joined(separator: " && ")
