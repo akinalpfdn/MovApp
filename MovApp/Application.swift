@@ -7,26 +7,24 @@ struct Application: Identifiable, Hashable {
     let bundleIdentifier: String?
     let installDate: Date?
 
-    // Cached icon for performance
-    private var _icon: NSImage?
+    // Session-level icon cache keyed by path
+    private static var iconCache: [String: NSImage] = [:]
 
     var icon: NSImage {
-        if let cached = _icon {
+        if let cached = Application.iconCache[path] {
             return cached
         }
-
-        // Get icon from NSWorkspace (fast, uses system cache)
         let icon = NSWorkspace.shared.icon(forFile: path)
         icon.size = NSSize(width: 64, height: 64)
+        Application.iconCache[path] = icon
         return icon
     }
 
-    init(name: String, path: String, bundleIdentifier: String? = nil, icon: NSImage? = nil) {
+    init(name: String, path: String, bundleIdentifier: String? = nil) {
         self.id = path
         self.name = name
         self.path = path
         self.bundleIdentifier = bundleIdentifier
-        self._icon = icon
 
         // Calculate install date
         var installDate: Date?

@@ -21,10 +21,15 @@ struct ContentView: View {
         }
         .background(.ultraThinMaterial)
         .onKeyPress(.escape) {
-            guard vm.isArrangeMode else { return .ignored }
-            vm.exitArrangeMode()
-            return .handled
+            if vm.isArrangeMode { vm.exitArrangeMode(); return .handled }
+            if vm.selectedIndex != nil { vm.clearSelection(); return .handled }
+            return .ignored
         }
+        .onKeyPress(.upArrow)    { guard !vm.isArrangeMode else { return .ignored }; vm.moveSelection(.up);    return .handled }
+        .onKeyPress(.downArrow)  { guard !vm.isArrangeMode else { return .ignored }; vm.moveSelection(.down);  return .handled }
+        .onKeyPress(.leftArrow)  { guard !vm.isArrangeMode else { return .ignored }; vm.moveSelection(.left);  return .handled }
+        .onKeyPress(.rightArrow) { guard !vm.isArrangeMode else { return .ignored }; vm.moveSelection(.right); return .handled }
+        .onKeyPress(.return)     { guard !vm.isArrangeMode, vm.selectedIndex != nil else { return .ignored }; vm.activateSelected(); return .handled }
         .sheet(item: $vm.openFolder) { folder in
             folderSheet(for: folder)
         }
@@ -58,6 +63,7 @@ struct ContentView: View {
                     .foregroundColor(.white)
                     .onChange(of: vm.searchText) { _, _ in
                         vm.currentPageIndex = 0
+                        vm.clearSelection()
                     }
             }
             .padding(12)
@@ -104,13 +110,16 @@ struct ContentView: View {
             let numPages = vm.calculatePageCount(totalItems: vm.filteredItems.count, rows: rows, cols: cols)
             let safePageIndex = min(vm.currentPageIndex, numPages - 1)
 
+            let itemsPerPage = max(1, rows * cols)
+
             HStack(spacing: 0) {
                 ForEach(0..<numPages, id: \.self) { pageIndex in
                     LazyVGrid(
                         columns: Array(repeating: SwiftUI.GridItem(.fixed(150), spacing: 30), count: cols),
                         spacing: 30
                     ) {
-                        ForEach(vm.itemsForPage(pageIndex, rows: rows, cols: cols)) { item in
+                        ForEach(Array(vm.itemsForPage(pageIndex, rows: rows, cols: cols).enumerated()), id: \.element.id) { localIndex, item in
+                            let globalIndex = pageIndex * itemsPerPage + localIndex
                             GridItemButton(
                                 item: item,
                                 isArrangeMode: $vm.isArrangeMode,
@@ -118,7 +127,8 @@ struct ContentView: View {
                                 gridItems: $vm.gridItems,
                                 folders: $vm.folders,
                                 openFolder: $vm.openFolder,
-                                filteredItems: vm.filteredItems
+                                filteredItems: vm.filteredItems,
+                                isSelected: vm.selectedIndex == globalIndex
                             )
                         }
                     }
