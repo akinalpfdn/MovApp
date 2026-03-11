@@ -1,12 +1,6 @@
-//
-//  MovAppApp.swift
-//  MovApp
-//
-//  Created by Akinalp Fidan on 6.10.2025.
-//
-
 import SwiftUI
 import ServiceManagement
+import Carbon.HIToolbox
 
 @main
 struct MovAppApp: App {
@@ -22,32 +16,83 @@ struct MovAppApp: App {
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    nonisolated(unsafe) static weak var instance: AppDelegate?
+
+    private var hotKeyRef: EventHotKeyRef?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Register for launch at login (silent — no prompt)
+        AppDelegate.instance = self
+
         if SMAppService.mainApp.status == .notRegistered {
             try? SMAppService.mainApp.register()
         }
 
-        // Configure window appearance
         if let window = NSApplication.shared.windows.first {
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.isOpaque = false
             window.backgroundColor = .clear
 
-            // Maximize window size to fill screen (not fullscreen)
             if let screen = NSScreen.main {
-                let screenFrame = screen.visibleFrame
-                window.setFrame(screenFrame, display: true)
+                window.setFrame(screen.visibleFrame, display: true)
             }
-
-            // Center window
             window.center()
+        }
+
+        registerGlobalHotKey()
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    // Return false → we handle reopen ourselves; SwiftUI won't create a second window
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showWindow()
+        return false
+    }
+
+    // MARK: - Window management
+
+    func showWindow() {
+        guard let window = NSApplication.shared.windows.first else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    func toggleWindow() {
+        guard let window = NSApplication.shared.windows.first else { return }
+        if window.isVisible && window.isKeyWindow {
+            window.orderOut(nil)
+        } else {
+            showWindow()
         }
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        return true
+    static func hideMainWindow() {
+        NSApplication.shared.windows.first?.orderOut(nil)
+    }
+
+    // MARK: - Global Hot Key (Option + Space)
+
+    private func registerGlobalHotKey() {
+        var hotKeyID = EventHotKeyID()
+        hotKeyID.signature = 0x4D564150 // "MVAP"
+        hotKeyID.id = 1
+
+        var eventSpec = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: OSType(kEventHotKeyPressed)
+        )
+
+        InstallEventHandler(
+            GetApplicationEventTarget(),
+            { _, _, _ -> OSStatus in
+                Task { @MainActor in AppDelegate.instance?.toggleWindow() }
+                return noErr
+            },
+            1, &eventSpec, nil, nil
+        )
+
+        RegisterEventHotKey(49, UInt32(optionKey), hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
     }
 }

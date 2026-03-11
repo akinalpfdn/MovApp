@@ -62,6 +62,32 @@ struct GridItemButton: View {
                 .padding(-6)
                 .animation(.easeInOut(duration: 0.15), value: isSelected)
         )
+        .contextMenu {
+            if case .app(let app) = item {
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: app.path)])
+                } label: {
+                    Label("Show in Finder", systemImage: "folder")
+                }
+            }
+            Button {
+                let name: String
+                switch item {
+                case .app(let app): name = app.name
+                case .folder(let folder): name = folder.name
+                }
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(name, forType: .string)
+            } label: {
+                Label("Copy Name", systemImage: "doc.on.clipboard")
+            }
+            Divider()
+            Button(role: .destructive) {
+                showDeleteConfirmation = true
+            } label: {
+                Label(item.isFolder ? "Delete Folder" : "Move to Trash", systemImage: "trash")
+            }
+        }
         .alert(alertTitle, isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button(item.isFolder ? "Delete Folder" : "Move to Trash", role: .destructive) {
