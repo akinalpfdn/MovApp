@@ -69,10 +69,25 @@ struct Application: Identifiable, Hashable {
         self.installDate = installDate
     }
 
-    // Launch the application
+    // Launch the application and hide the launcher window
     func launch() {
-        let url = URL(fileURLWithPath: path)
-        NSWorkspace.shared.open(url)
+        NSWorkspace.shared.open(URL(fileURLWithPath: path))
+        recordUsage()
+        AppDelegate.hideMainWindow()
+    }
+
+    // MARK: - Usage tracking
+
+    var lastUsed: Date? {
+        guard let ts = (UserDefaults.standard.dictionary(forKey: "appLastUsed") as? [String: Double])?[path]
+        else { return nil }
+        return Date(timeIntervalSince1970: ts)
+    }
+
+    private func recordUsage() {
+        var usage = UserDefaults.standard.dictionary(forKey: "appLastUsed") as? [String: Double] ?? [:]
+        usage[path] = Date().timeIntervalSince1970
+        UserDefaults.standard.set(usage, forKey: "appLastUsed")
     }
 
     // Uninstall the application and related files

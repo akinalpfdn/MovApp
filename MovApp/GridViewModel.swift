@@ -6,6 +6,7 @@ enum SortOption: String, CaseIterable {
     case nameAsc = "Name (A-Z)"
     case nameDesc = "Name (Z-A)"
     case installDate = "Install Date (Newest Last)"
+    case recentlyUsed = "Recently Used"
 }
 
 final class GridViewModel: ObservableObject {
@@ -112,6 +113,10 @@ final class GridViewModel: ObservableObject {
             return items.sorted {
                 (itemInstallDate($0) ?? .distantPast) < (itemInstallDate($1) ?? .distantPast)
             }
+        case .recentlyUsed:
+            return items.sorted {
+                (itemLastUsed($0) ?? .distantPast) > (itemLastUsed($1) ?? .distantPast)
+            }
         }
     }
 
@@ -126,6 +131,13 @@ final class GridViewModel: ObservableObject {
         switch item {
         case .app(let app): return app.installDate
         case .folder(let folder): return folder.apps.compactMap { $0.installDate }.min()
+        }
+    }
+
+    private func itemLastUsed(_ item: GridItem) -> Date? {
+        switch item {
+        case .app(let app): return app.lastUsed
+        case .folder(let folder): return folder.apps.compactMap { $0.lastUsed }.max()
         }
     }
 
@@ -242,8 +254,10 @@ final class GridViewModel: ObservableObject {
     func activateSelected() {
         guard let idx = selectedIndex, idx < filteredItems.count else { return }
         switch filteredItems[idx] {
-        case .app(let app):        app.launch()
-        case .folder(let folder): openFolder = folder
+        case .app(let app):
+            app.launch() // launch() also hides the window
+        case .folder(let folder):
+            openFolder = folder
         }
     }
 
@@ -269,7 +283,7 @@ final class GridViewModel: ObservableObject {
 
         scrollDebounceTask = Task {
             try? await Task.sleep(nanoseconds: 600_000_000)
-            if !Task.isCancelled { isScrolling = false }
+            isScrolling = false
         }
     }
 

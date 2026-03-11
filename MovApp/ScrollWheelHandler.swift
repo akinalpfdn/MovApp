@@ -1,23 +1,33 @@
 import SwiftUI
 
+/// Monitors horizontal scroll wheel events at the application level.
+/// Using a local event monitor is more reliable than overriding scrollWheel(with:)
+/// on an NSView, which depends on uncertain first-responder/hit-testing behaviour.
 struct ScrollWheelHandler: NSViewRepresentable {
     var onScroll: (CGFloat) -> Void
 
-    func makeNSView(context: Context) -> ScrollWheelView {
-        let view = ScrollWheelView()
-        view.onScroll = onScroll
-        return view
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.onScroll = onScroll
     }
 
-    func updateNSView(_ nsView: ScrollWheelView, context: Context) {
-        nsView.onScroll = onScroll
-    }
+    func makeCoordinator() -> Coordinator { Coordinator(onScroll: onScroll) }
 
-    class ScrollWheelView: NSView {
-        var onScroll: ((CGFloat) -> Void)?
+    final class Coordinator {
+        var onScroll: (CGFloat) -> Void
+        private var monitor: Any?
 
-        override func scrollWheel(with event: NSEvent) {
-            onScroll?(event.scrollingDeltaX)
+        init(onScroll: @escaping (CGFloat) -> Void) {
+            self.onScroll = onScroll
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+                self?.onScroll(event.scrollingDeltaX)
+                return event  // don't consume — let other views receive it too
+            }
+        }
+
+        deinit {
+            if let monitor { NSEvent.removeMonitor(monitor) }
         }
     }
 }
