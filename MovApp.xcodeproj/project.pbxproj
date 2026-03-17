@@ -18,11 +18,16 @@
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
+/* Begin PBXBuildFile section */
+		2217EC7884CD4CCEA8529C73 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = D09466C4EFED40918AF0246B /* Sparkle */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFrameworksBuildPhase section */
 		F476A9302E943A6300C59DC0 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2217EC7884CD4CCEA8529C73 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = MovApp;
 			packageProductDependencies = (
+				D09466C4EFED40918AF0246B /* Sparkle */,
 			);
 			productName = MovApp;
 			productReference = F476A9332E943A6300C59DC0 /* MovApp.app */;
@@ -100,6 +106,9 @@
 			projectRoot = "";
 			targets = (
 				F476A9322E943A6300C59DC0 /* MovApp */,
+			);
+			packageReferences = (
+				5CA416652B7246FFABEB2D8F /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 		};
 /* End PBXProject section */
@@ -261,6 +270,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_SUFeedURL = "https://raw.githubusercontent.com/akinalpfdn/MovApp/main/appcast.xml";
+				INFOPLIST_KEY_SUPublicEDKey = "wWLr5ZzL6da+Dcqy9sMkwt1Zo28R6GfY1K2r2Kfxlx8=";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -295,6 +306,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_SUFeedURL = "https://raw.githubusercontent.com/akinalpfdn/MovApp/main/appcast.xml";
+				INFOPLIST_KEY_SUPublicEDKey = "wWLr5ZzL6da+Dcqy9sMkwt1Zo28R6GfY1K2r2Kfxlx8=";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -335,6 +348,26 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5CA416652B7246FFABEB2D8F /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D09466C4EFED40918AF0246B /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5CA416652B7246FFABEB2D8F /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
+
 	};
 	rootObject = F476A92B2E943A6300C59DC0 /* Project object */;
 }

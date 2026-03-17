@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>MovApp</title>
+        <link>https://github.com/akinalpfdn/MovApp</link>
+        <description>MovApp update feed</description>
+        <language>en</language>
+        <item>
+            <title>MovApp 2.0.0</title>
+            <pubDate>Wed, 18 Mar 2026 00:00:00 +0000</pubDate>
+            <sparkle:version>3</sparkle:version>
+            <sparkle:shortVersionString>2.0.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <h3>What's New in 2.0.0</h3>
+                <ul>
+                    <li>Global Hotkey (Option+Space) — show/hide from anywhere</li>
+                    <li>Background running — app stays alive when window is closed</li>
+                    <li>Launch at login</li>
+                    <li>Right-click context menu (Show in Finder, Copy Name, Move to Trash)</li>
+                    <li>Recently Used sort option</li>
+                    <li>Fixed horizontal scroll navigation</li>
+                    <li>Fixed double window opening</li>
+                    <li>Performance improvements (reactive cache, icon cache)</li>
+                </ul>
+            ]]></description>
+            <enclosure
+                url="https://github.com/akinalpfdn/MovApp/releases/download/v2.0.0/MovApp-2.0.0.dmg"
+                sparkle:edSignature="tWSmp8pJE8i7jc6Ulp718cXE03qhaeCkdryNzvr5c7afWqyeEcKK5L2v5ZrtctKs1T8Fu2u48bN/E/WhR/kYCg=="
+                length="18714145"
+                type="application/octet-stream"
+            />
+        </item>
+    </channel>
+</rss>
