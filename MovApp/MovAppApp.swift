@@ -29,7 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var hotKeyRef: EventHotKeyRef?
     private var mainWindow: NSWindow?
-    private var updaterController: SPUStandardUpdaterController!
+    var updaterController: SPUStandardUpdaterController!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppDelegate.instance = self
