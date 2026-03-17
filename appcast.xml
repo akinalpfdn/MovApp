@@ -6,8 +6,28 @@
         <description>MovApp update feed</description>
         <language>en</language>
         <item>
+            <title>MovApp 2.1.0</title>
+            <pubDate>Tue, 18 Mar 2026 00:00:00 +0000</pubDate>
+            <sparkle:version>4</sparkle:version>
+            <sparkle:shortVersionString>2.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <h3>What's New in 2.1.0</h3>
+                <ul>
+                    <li>Auto-updater — the app now checks for updates automatically</li>
+                    <li>Fixed window not opening from dock or hotkey in some cases</li>
+                </ul>
+            ]]></description>
+            <enclosure
+                url="https://github.com/akinalpfdn/MovApp/releases/latest/download/MovApp.dmg"
+                sparkle:edSignature="oc3NziD3+Y5akNncBWZ+kxkfMZi63d8pgyrK+R3hs+FfrXkqD80BNjoabK5VufAb4DPk40RhW8RMkJH27OuzBg=="
+                length="19205788"
+                type="application/octet-stream"
+            />
+        </item>
+        <item>
             <title>MovApp 2.0.0</title>
-            <pubDate>Wed, 18 Mar 2026 00:00:00 +0000</pubDate>
+            <pubDate>Wed, 11 Mar 2026 00:00:00 +0000</pubDate>
             <sparkle:version>3</sparkle:version>
             <sparkle:shortVersionString>2.0.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
