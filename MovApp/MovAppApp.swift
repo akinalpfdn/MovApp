@@ -1,6 +1,7 @@
 import SwiftUI
 import ServiceManagement
 import Carbon.HIToolbox
+import Sparkle
 
 @main
 struct MovAppApp: App {
@@ -13,6 +14,13 @@ struct MovAppApp: App {
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
         .defaultSize(width: 1200, height: 800)
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    AppDelegate.instance?.updaterController.checkForUpdates(nil)
+                }
+            }
+        }
     }
 }
 
@@ -21,9 +29,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var hotKeyRef: EventHotKeyRef?
     private var mainWindow: NSWindow?
+    private var updaterController: SPUStandardUpdaterController!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppDelegate.instance = self
+        updaterController = SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: nil,
+            userDriverDelegate: nil
+        )
 
         if SMAppService.mainApp.status == .notRegistered {
             try? SMAppService.mainApp.register()
