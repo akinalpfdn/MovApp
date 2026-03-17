@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     nonisolated(unsafe) static weak var instance: AppDelegate?
 
     private var hotKeyRef: EventHotKeyRef?
+    private var mainWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppDelegate.instance = self
@@ -28,7 +29,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             try? SMAppService.mainApp.register()
         }
 
-        if let window = NSApplication.shared.windows.first {
+        // Store strong reference so we always find the right window
+        mainWindow = NSApplication.shared.windows.first
+
+        if let window = mainWindow {
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.isOpaque = false
@@ -54,13 +58,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Window management
 
     func showWindow() {
-        guard let window = NSApplication.shared.windows.first else { return }
+        guard let window = mainWindow else { return }
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
     }
 
     func toggleWindow() {
-        guard let window = NSApplication.shared.windows.first else { return }
+        guard let window = mainWindow else { return }
         if window.isVisible && window.isKeyWindow {
             window.orderOut(nil)
         } else {
@@ -69,7 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     static func hideMainWindow() {
-        NSApplication.shared.windows.first?.orderOut(nil)
+        AppDelegate.instance?.mainWindow?.orderOut(nil)
     }
 
     // MARK: - Global Hot Key (Option + Space)
